@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum DiscussionStatus {
+  DRAFT
+  CONFIRMED
+  ONGOING
+  ENDED
+}
+
+enum ParticipantRole {
+  HOST
+  EXPERT
+}
+
+// ── Models ─────────────────────────────────────────────
+
+model Discussion {
+  id         String           @id @default(uuid())
+  topic      String
+  status     DiscussionStatus @default(DRAFT)
+  config     String           @default("{}") // JSON text stored as String for SQLite compat
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  participants     Participant[]
+  transcriptEntries TranscriptEntry[]
+  consensusItems    ConsensusItem[]
+  divergenceItems   DivergenceItem[]
+}
+
+model Participant {
+  id            String          @id @default(uuid())
+  discussion_id String
+  name          String
+  role          ParticipantRole
+  title         String
+  stance        String
+  color         String
+
+  discussion Discussion        @relation(fields: [discussion_id], references: [id], onDelete: Cascade)
+  speeches   TranscriptEntry[]
+
+  @@index([discussion_id])
+}
+
+model TranscriptEntry {
+  id            String   @id @default(uuid())
+  discussion_id String
+  speaker_id    String
+  content       String
+  timestamp     DateTime @default(now())
+
+  discussion Discussion  @relation(fields: [discussion_id], references: [id], onDelete: Cascade)
+  speaker    Participant @relation(fields: [speaker_id], references: [id], onDelete: Cascade)
+
+  @@index([discussion_id])
+  @@index([speaker_id])
+}
+
+model ConsensusItem {
+  id            String   @id @default(uuid())
+  discussion_id String
+  content       String
+  generated_at  DateTime @default(now())
+
+  discussion Discussion @relation(fields: [discussion_id], references: [id], onDelete: Cascade)
+
+  @@index([discussion_id])
+}
+
+model DivergenceItem {
+  id                    String   @id @default(uuid())
+  discussion_id         String
+  content               String
+  involved_participants String   @default("[]") // JSON array of participant UUIDs
+  generated_at          DateTime @default(now())
+
+  discussion Discussion @relation(fields: [discussion_id], references: [id], onDelete: Cascade)
+
+  @@index([discussion_id])
+}

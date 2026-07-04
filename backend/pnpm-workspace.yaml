@@ -1,4 +1,4 @@
 allowBuilds:
-  '@prisma/engines': set this to true or false
-  prisma: set this to true or false
-  sqlite3: set this to true or false
+  '@prisma/engines': true
+  prisma: true
+  sqlite3: true
