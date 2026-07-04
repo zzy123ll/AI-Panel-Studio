@@ -139,6 +139,82 @@
   display: none;
 }
 
+/* ── Summary Bar (post-end) ──────── */
+
+.summaryBar {
+  flex-shrink: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--host-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.summaryLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--host-color);
+  margin-bottom: var(--space-xs);
+}
+
+.summaryText {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+/* ── Controls Bar ────────────────── */
+
+.controls {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+  padding-top: var(--space-xs);
+}
+
+.startBtn,
+.endBtn,
+.backBtn {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.startBtn {
+  background: #4caf50;
+  color: #fff;
+}
+
+.startBtn:hover {
+  background: #43a047;
+}
+
+.endBtn {
+  background: #ef5350;
+  color: #fff;
+}
+
+.endBtn:hover {
+  background: #e53935;
+}
+
+.backBtn {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.backBtn:hover {
+  background: var(--border-color);
+}
+
 /* ═══════════════════════════════════════════════════════
    Responsive: < 1024px
    ═══════════════════════════════════════════════════════ */
