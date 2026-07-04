@@ -2,3 +2,4 @@ allowBuilds:
   '@prisma/engines': true
   prisma: true
   sqlite3: true
+  unrs-resolver: true
