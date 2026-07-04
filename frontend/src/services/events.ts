@@ -1,0 +1,19 @@
+/**
+ * Standardized WebSocket event type constants.
+ * Must stay in sync with backend/src/contracts/events.ts.
+ */
+
+export const WS_EVENT = {
+  TRANSCRIPT_APPEND: "TRANSCRIPT_APPEND",
+  CONSENSUS_NEW: "CONSENSUS_NEW",
+  DIVERGENCE_NEW: "DIVERGENCE_NEW",
+  AGENT_STATUS_CHANGE: "AGENT_STATUS_CHANGE",
+  DISCUSSION_END: "DISCUSSION_END",
+  HISTORY: "HISTORY",
+  CONFIRMED: "CONFIRMED",
+  STOPPED: "STOPPED",
+  ERROR: "ERROR",
+  JOIN: "JOIN",
+  CLIENT_CONFIRM: "CLIENT_CONFIRM",
+  CLIENT_STOP: "CLIENT_STOP",
+} as const;

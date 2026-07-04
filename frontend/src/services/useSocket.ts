@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
+import { WS_EVENT } from "./events.js";
 
 /* ── Types ──────────────────────────────────────────── */
 
@@ -22,6 +23,28 @@ export interface HistoryPayload {
   }>;
 }
 
+export interface AgentStatusPayload {
+  discussionId: string;
+  agents: Array<{
+    expertId: string;
+    expertName: string;
+    state: string;
+    publicThought: string;
+  }>;
+}
+
+export interface ConsensusDivergencePayload {
+  discussionId: string;
+  items: string[];
+  isFinal?: boolean;
+}
+
+export interface DiscussionEndPayload {
+  discussionId: string;
+  topic: string;
+  transcriptCount: number;
+}
+
 const SOCKET_URL = "http://localhost:3001/studio";
 
 /* ── Singleton factory ──────────────────────────────── */
@@ -38,10 +61,6 @@ function getSocket(): Socket {
   return socket;
 }
 
-/**
- * Disconnect and release the current socket instance.
- * Call this on explicit logout / cleanup.
- */
 export function disconnectSocket(): void {
   if (socket) {
     socket.disconnect();
@@ -56,75 +75,104 @@ interface UseSocketOptions {
   onTranscript?: (event: TranscriptEvent) => void;
   onHistory?: (payload: HistoryPayload) => void;
   onConfirmed?: () => void;
+  onAgentStatusChange?: (payload: AgentStatusPayload) => void;
+  onConsensusNew?: (payload: ConsensusDivergencePayload) => void;
+  onDivergenceNew?: (payload: ConsensusDivergencePayload) => void;
+  onDiscussionEnd?: (payload: DiscussionEndPayload) => void;
   onError?: (message: string) => void;
 }
 
-/**
- * Manages a Socket.io connection for a single discussion room.
- * Automatically joins the room and tears down listeners on
- * discussionId change or unmount — preventing memory leaks.
- */
 export function useSocket({
   discussionId,
   onTranscript,
   onHistory,
   onConfirmed,
+  onAgentStatusChange,
+  onConsensusNew,
+  onDivergenceNew,
+  onDiscussionEnd,
   onError,
 }: UseSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
-  const callbacksRef = useRef({ onTranscript, onHistory, onConfirmed, onError });
-  // Keep callbacks fresh without re-registering listeners
-  callbacksRef.current = { onTranscript, onHistory, onConfirmed, onError };
+  const callbacksRef = useRef({
+    onTranscript,
+    onHistory,
+    onConfirmed,
+    onAgentStatusChange,
+    onConsensusNew,
+    onDivergenceNew,
+    onDiscussionEnd,
+    onError,
+  });
+  callbacksRef.current = {
+    onTranscript,
+    onHistory,
+    onConfirmed,
+    onAgentStatusChange,
+    onConsensusNew,
+    onDivergenceNew,
+    onDiscussionEnd,
+    onError,
+  };
 
-  /* Join room whenever discussionId changes */
   useEffect(() => {
     if (!discussionId) return;
 
     const s = getSocket();
     socketRef.current = s;
 
-    /* Ensure connected */
     if (!s.connected) s.connect();
 
-    s.emit("join", discussionId);
+    s.emit(WS_EVENT.JOIN, discussionId);
 
-    /* ── Wire events (use stable wrapper that reads fresh callbacks) ── */
-    const handleTranscript = (data: TranscriptEvent) => {
+    /* ── Wire standardized events ── */
+    const handleTranscript = (data: TranscriptEvent) =>
       callbacksRef.current.onTranscript?.(data);
-    };
-    const handleHistory = (data: HistoryPayload) => {
+    const handleHistory = (data: HistoryPayload) =>
       callbacksRef.current.onHistory?.(data);
-    };
-    const handleConfirmed = () => {
+    const handleConfirmed = () =>
       callbacksRef.current.onConfirmed?.();
-    };
-    const handleError = (data: { message: string }) => {
+    const handleAgentStatus = (data: AgentStatusPayload) =>
+      callbacksRef.current.onAgentStatusChange?.(data);
+    const handleConsensus = (data: ConsensusDivergencePayload) =>
+      callbacksRef.current.onConsensusNew?.(data);
+    const handleDivergence = (data: ConsensusDivergencePayload) =>
+      callbacksRef.current.onDivergenceNew?.(data);
+    const handleDiscussionEnd = (data: DiscussionEndPayload) =>
+      callbacksRef.current.onDiscussionEnd?.(data);
+    const handleError = (data: { message: string }) =>
       callbacksRef.current.onError?.(data.message);
-    };
 
-    s.on("transcript", handleTranscript);
-    s.on("history", handleHistory);
-    s.on("confirmed", handleConfirmed);
-    s.on("error", handleError);
+    s.on(WS_EVENT.TRANSCRIPT_APPEND, handleTranscript);
+    s.on(WS_EVENT.HISTORY, handleHistory);
+    s.on(WS_EVENT.CONFIRMED, handleConfirmed);
+    s.on(WS_EVENT.AGENT_STATUS_CHANGE, handleAgentStatus);
+    s.on(WS_EVENT.CONSENSUS_NEW, handleConsensus);
+    s.on(WS_EVENT.DIVERGENCE_NEW, handleDivergence);
+    s.on(WS_EVENT.DISCUSSION_END, handleDiscussionEnd);
+    s.on(WS_EVENT.ERROR, handleError);
 
     return () => {
-      s.off("transcript", handleTranscript);
-      s.off("history", handleHistory);
-      s.off("confirmed", handleConfirmed);
-      s.off("error", handleError);
+      s.off(WS_EVENT.TRANSCRIPT_APPEND, handleTranscript);
+      s.off(WS_EVENT.HISTORY, handleHistory);
+      s.off(WS_EVENT.CONFIRMED, handleConfirmed);
+      s.off(WS_EVENT.AGENT_STATUS_CHANGE, handleAgentStatus);
+      s.off(WS_EVENT.CONSENSUS_NEW, handleConsensus);
+      s.off(WS_EVENT.DIVERGENCE_NEW, handleDivergence);
+      s.off(WS_EVENT.DISCUSSION_END, handleDiscussionEnd);
+      s.off(WS_EVENT.ERROR, handleError);
     };
   }, [discussionId]);
 
-  /* ── Actions ────────────────────────────────────────── */
   const confirm = useCallback(() => {
     if (discussionId && socketRef.current) {
-      socketRef.current.emit("client_confirm", discussionId);
+      socketRef.current.emit(WS_EVENT.CLIENT_CONFIRM, discussionId);
     }
   }, [discussionId]);
 
   const stopSession = useCallback(() => {
     if (discussionId && socketRef.current) {
-      socketRef.current.emit("client_stop", discussionId);
+      socketRef.current.emit(WS_EVENT.CLIENT_STOP, discussionId);
     }
   }, [discussionId]);
 

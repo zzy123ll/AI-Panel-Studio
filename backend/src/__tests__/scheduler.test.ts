@@ -4,10 +4,12 @@
 
 jest.mock("../infrastructure/aiClient.js", () => ({
   decideAction: jest.fn(),
+  extractConsensus: jest.fn().mockResolvedValue({ consensus: [], divergences: [] }),
 }));
 
 import { decideAction } from "../infrastructure/aiClient.js";
 import { Scheduler } from "../agents/Scheduler.js";
+import { WS_EVENT } from "../contracts/events.js";
 import type { Expert, NewMessagePayload } from "../agents/Scheduler.js";
 
 const mockedDecideAction = decideAction as jest.Mock;
@@ -75,7 +77,7 @@ describe("Scheduler state machine", () => {
     );
 
     const messages: NewMessagePayload[] = [];
-    scheduler.on("newMessage", (msg: NewMessagePayload) => messages.push(msg));
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => messages.push(msg));
 
     // Before tick: all idle
     expect(scheduler.getExpertStates().map((s) => s.state)).toEqual([
@@ -214,7 +216,7 @@ describe("Scheduler conflict resolution", () => {
       .mockResolvedValueOnce(mockAction("interject", "expert opinion"));
 
     const messages: NewMessagePayload[] = [];
-    scheduler.on("newMessage", (msg: NewMessagePayload) => messages.push(msg));
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => messages.push(msg));
 
     await scheduler.tick();
 
@@ -253,7 +255,7 @@ describe("Scheduler conflict resolution", () => {
       .mockResolvedValueOnce(mockAction("interject", "B wants speak"));
 
     const messages: NewMessagePayload[] = [];
-    scheduler.on("newMessage", (msg: NewMessagePayload) => messages.push(msg));
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => messages.push(msg));
 
     await scheduler.tick();
 
@@ -299,7 +301,7 @@ describe("Scheduler conflict resolution", () => {
       .mockResolvedValueOnce(mockAction("interject", "C agrees"));
 
     const messages: NewMessagePayload[] = [];
-    scheduler.on("newMessage", (msg: NewMessagePayload) => messages.push(msg));
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => messages.push(msg));
 
     await scheduler.tick();
 
@@ -333,7 +335,7 @@ describe("Scheduler prevents consecutive same speaker", () => {
     );
 
     const messages: NewMessagePayload[] = [];
-    scheduler.on("newMessage", (msg: NewMessagePayload) => messages.push(msg));
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => messages.push(msg));
 
     await scheduler.tick();
     expect(messages).toHaveLength(1);
@@ -364,7 +366,7 @@ describe("Scheduler prevents consecutive same speaker", () => {
    ─────────────────────────────────────────────────────── */
 
 describe("Scheduler event emission", () => {
-  it("emits 'newMessage' with correct payload on interject", async () => {
+  it("emits WS_EVENT.TRANSCRIPT_APPEND with correct payload on interject", async () => {
     const scheduler = new Scheduler({
       topic: "AI 安全",
       experts: mockExperts,
@@ -376,7 +378,7 @@ describe("Scheduler event emission", () => {
     );
 
     const messagePromise = new Promise<NewMessagePayload>((resolve) => {
-      scheduler.once("newMessage", (msg: NewMessagePayload) => resolve(msg));
+      scheduler.once(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => resolve(msg));
     });
 
     await scheduler.tick();
@@ -393,7 +395,7 @@ describe("Scheduler event emission", () => {
     jest.restoreAllMocks();
   });
 
-  it("emits 'newMessage' with rebut intent", async () => {
+  it("emits WS_EVENT.TRANSCRIPT_APPEND with rebut intent", async () => {
     const scheduler = new Scheduler({
       topic: "AI 安全",
       experts: mockExperts,
@@ -405,7 +407,7 @@ describe("Scheduler event emission", () => {
     );
 
     const messagePromise = new Promise<NewMessagePayload>((resolve) => {
-      scheduler.once("newMessage", (msg: NewMessagePayload) => resolve(msg));
+      scheduler.once(WS_EVENT.TRANSCRIPT_APPEND, (msg: NewMessagePayload) => resolve(msg));
     });
 
     await scheduler.tick();
@@ -425,7 +427,7 @@ describe("Scheduler event emission", () => {
     mockedDecideAction.mockResolvedValueOnce(mockAction("WAIT", ""));
 
     const callback = jest.fn();
-    scheduler.on("newMessage", callback);
+    scheduler.on(WS_EVENT.TRANSCRIPT_APPEND, callback);
 
     await scheduler.tick();
 

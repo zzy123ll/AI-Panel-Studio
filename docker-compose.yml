@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  backend:
+    image: node:22-alpine
+    working_dir: /app/backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app/backend
+      - ./pnpm-workspace.yaml:/app/pnpm-workspace.yaml
+      - node_modules_backend:/app/backend/node_modules
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PORT=3001
+    command: >
+      sh -c "
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm exec prisma generate &&
+        pnpm exec prisma migrate deploy &&
+        pnpm exec tsx src/server.ts
+      "
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app/frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app/frontend
+      - node_modules_frontend:/app/frontend/node_modules
+    depends_on:
+      - backend
+    command: >
+      sh -c "
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm dev --host 0.0.0.0
+      "
+
+volumes:
+  node_modules_backend:
+  node_modules_frontend:

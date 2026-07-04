@@ -1,9 +1,12 @@
 import { EventEmitter } from "events";
-import { decideAction } from "../infrastructure/aiClient.js";
+import { decideAction, extractConsensus } from "../infrastructure/aiClient.js";
+import { ContextManager } from "./ContextManager.js";
+import { AgentBrain } from "./AgentBrain.js";
+import { WS_EVENT } from "../contracts/events.js";
 
 /* ── Types ─────────────────────────────────────────── */
 
-export type ExpertState = "idle" | "preparing" | "speaking";
+export type ExpertState = "idle" | "preparing" | "raising_hand" | "speaking";
 
 export interface Expert {
   id: string;
@@ -18,6 +21,7 @@ export interface ExpertStateEntry {
   stance: string;
   isHost: boolean;
   state: ExpertState;
+  publicThought: string;
 }
 
 export interface TranscriptEntry {
@@ -41,6 +45,8 @@ export interface SchedulerConfig {
   topic: string;
   experts: Expert[];
   tickIntervalMs?: number;
+  /** Emit consensus every N transcript entries (default 5) */
+  consensusInterval?: number;
 }
 
 /* ── Scheduler ──────────────────────────────────────── */
@@ -48,33 +54,43 @@ export interface SchedulerConfig {
 export class Scheduler extends EventEmitter {
   readonly tickInterval: number;
   private readonly topic: string;
-  private readonly experts: Map<string, ExpertStateEntry>;
+  private readonly agents: Map<string, AgentBrain>;
   private readonly transcript: TranscriptEntry[] = [];
+  private readonly contextManager = new ContextManager();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastSpeakerId: string | null = null;
   private running = false;
   private messageCounter = 0;
+  private readonly consensusInterval: number;
 
   constructor(config: SchedulerConfig) {
     super();
     this.topic = config.topic;
     this.tickInterval = config.tickIntervalMs ?? 4000;
-    this.experts = new Map();
+    this.consensusInterval = config.consensusInterval ?? 5;
+    this.agents = new Map();
     for (const expert of config.experts) {
-      this.experts.set(expert.id, {
+      const brain = new AgentBrain({
         expertId: expert.id,
         expertName: expert.name,
         stance: expert.stance,
         isHost: expert.isHost,
-        state: "idle",
       });
+      this.agents.set(expert.id, brain);
     }
   }
 
   /* ── Public API ──────────────────────────────────── */
 
   getExpertStates(): ExpertStateEntry[] {
-    return [...this.experts.values()];
+    return [...this.agents.values()].map((a) => ({
+      expertId: a.expertId,
+      expertName: a.expertName,
+      stance: a.stance,
+      isHost: a.isHost,
+      state: a.state,
+      publicThought: a.publicThought,
+    }));
   }
 
   getTranscript(): TranscriptEntry[] {
@@ -101,75 +117,84 @@ export class Scheduler extends EventEmitter {
       clearInterval(this.timer);
       this.timer = null;
     }
+    this.emit(WS_EVENT.DISCUSSION_END, {
+      topic: this.topic,
+      transcriptCount: this.transcript.length,
+    });
   }
 
   /**
    * Execute one scheduler tick:
-   * 1. Pick 1-2 idle experts at random
-   * 2. Call decideAction for each with transcript + topic context
+   * 1. Pick 1-2 idle agents at random
+   * 2. Call decideAction for each with compressed context
    * 3. Resolve conflicts (host priority, then stance opposition)
-   * 4. Emit 'newMessage' for the winner
+   * 4. Emit TRANSCRIPT_APPEND + AGENT_STATUS_CHANGE
+   * 5. Periodically trigger consensus extraction
    */
   async tick(): Promise<void> {
-    const candidates = this.pickIdleExperts();
+    const candidates = this.pickIdleAgents();
     if (candidates.length === 0) return;
 
-    /* Mark selected experts as preparing */
-    for (const c of candidates) {
-      c.state = "preparing";
+    /* Mark selected agents as preparing */
+    for (const agent of candidates) {
+      agent.prepare();
     }
+    this.broadcastAgentStatus(candidates);
 
-    /* Ask each selected expert what they want to do */
+    /* Ask each selected agent what they want to do */
+    const history = this.contextManager.buildHistory(this.transcript);
     const results = await Promise.allSettled(
-      candidates.map(async (entry) => {
-        const history = this.formatTranscript();
+      candidates.map(async (agent) => {
         const context: Record<string, unknown> = {
-          expertId: entry.expertId,
-          expertName: entry.expertName,
+          expertId: agent.expertId,
+          expertName: agent.expertName,
           topic: this.topic,
-          isHost: entry.isHost,
-          stance: entry.stance,
+          isHost: agent.isHost,
+          stance: agent.stance,
         };
         const result = await decideAction(context, history);
-        // Widen intent type — Scheduler accepts any intent the AI returns
-        return { entry, result: result as { intent: string; content: string } };
+        return { agent, result: result as { intent: string; content: string } };
       }),
     );
 
-    /* Only keep experts who returned a speak-related intent */
+    /* Only keep agents who returned a speak-related intent */
     const speakers = results
       .filter(
         (
           r,
         ): r is PromiseFulfilledResult<{
-          entry: ExpertStateEntry;
+          agent: AgentBrain;
           result: { intent: string; content: string };
         }> =>
           r.status === "fulfilled" &&
-          ["interject", "rebut", "SPEAK"].includes(
-            r.value.result.intent,
-          ),
+          ["interject", "rebut", "SPEAK"].includes(r.value.result.intent),
       )
       .map((r) => r.value);
 
+    /* Mark speakers as raising_hand */
+    for (const s of speakers) {
+      s.agent.raiseHand(s.result.content.slice(0, 100));
+    }
+
     if (speakers.length === 0) {
       /* Nobody wants to speak — return everyone to idle */
-      for (const c of candidates) {
-        c.state = "idle";
+      for (const agent of candidates) {
+        agent.idle();
       }
+      this.broadcastAgentStatus(candidates);
       return;
     }
 
     /* Conflict resolution */
     const winner = this.resolveConflict(speakers);
 
-    /* Mark winner as speaking */
-    winner.entry.state = "speaking";
+    /* Winner speaks */
+    winner.agent.speak();
 
     const now = Date.now();
     const message: NewMessagePayload = {
-      expertId: winner.entry.expertId,
-      expertName: winner.entry.expertName,
+      expertId: winner.agent.expertId,
+      expertName: winner.agent.expertName,
       content: winner.result.content,
       intent: winner.result.intent,
       timestamp: now,
@@ -178,38 +203,48 @@ export class Scheduler extends EventEmitter {
     /* Record in transcript */
     this.transcript.push({
       id: `msg-${now}-${++this.messageCounter}`,
-      speaker: winner.entry.expertName,
-      speakerId: winner.entry.expertId,
+      speaker: winner.agent.expertName,
+      speakerId: winner.agent.expertId,
       content: winner.result.content,
       intent: winner.result.intent,
       timestamp: now,
     });
 
-    /* Emit event to consumers */
-    this.emit("newMessage", message);
+    /* Emit standardized events */
+    this.emit(WS_EVENT.TRANSCRIPT_APPEND, message);
 
     /* Update last-speaker tracking */
-    this.lastSpeakerId = winner.entry.expertId;
+    this.lastSpeakerId = winner.agent.expertId;
 
-    /* Reset winner to idle */
-    winner.entry.state = "idle";
-
-    /* Reset losers to idle */
-    for (const s of speakers) {
-      if (s.entry.expertId !== winner.entry.expertId) {
-        s.entry.state = "idle";
+    /* Reset all agents to idle, clear consecutive counts for non-winners */
+    for (const agent of this.agents.values()) {
+      if (agent.expertId !== winner.agent.expertId) {
+        agent.resetConsecutiveCount();
       }
+    }
+    for (const s of speakers) {
+      s.agent.idle();
+    }
+    for (const agent of candidates) {
+      if (agent.state !== "idle") agent.idle();
+    }
+    this.broadcastAgentStatus([...this.agents.values()]);
+
+    /* Periodic consensus extraction (every N entries) */
+    if (
+      this.transcript.length > 0 &&
+      this.transcript.length % this.consensusInterval === 0
+    ) {
+      this.extractAndBroadcastConsensus();
     }
   }
 
   /* ── Private helpers ─────────────────────────────── */
 
-  /**
-   * Randomly select 1–2 idle experts, excluding the last speaker.
-   */
-  private pickIdleExperts(): ExpertStateEntry[] {
-    const idle = [...this.experts.values()].filter(
-      (e) => e.state === "idle" && e.expertId !== this.lastSpeakerId,
+  private pickIdleAgents(): AgentBrain[] {
+    const idle = [...this.agents.values()].filter(
+      (a) =>
+        a.isAvailable && a.expertId !== this.lastSpeakerId,
     );
 
     if (idle.length === 0) return [];
@@ -225,55 +260,44 @@ export class Scheduler extends EventEmitter {
     return idle.slice(0, count);
   }
 
-  /**
-   * Resolve conflicts when multiple experts want to speak simultaneously:
-   * 1. Host priority — if exactly one host, they win
-   * 2. Stance opposition — pick the expert whose stance is most opposed
-   *    to the last speaker. Ties break to the first candidate.
-   */
   private resolveConflict(
     speakers: Array<{
-      entry: ExpertStateEntry;
+      agent: AgentBrain;
       result: { intent: string; content: string };
     }>,
   ): {
-    entry: ExpertStateEntry;
+    agent: AgentBrain;
     result: { intent: string; content: string };
   } {
     if (speakers.length === 1) return speakers[0];
 
     /* Host priority */
-    const hosts = speakers.filter((s) => s.entry.isHost);
+    const hosts = speakers.filter((s) => s.agent.isHost);
     if (hosts.length === 1) return hosts[0];
 
     /* Multiple hosts or no hosts — use stance opposition */
     const candidates = hosts.length > 1 ? hosts : speakers;
 
     const lastSpeaker = this.lastSpeakerId
-      ? this.experts.get(this.lastSpeakerId)
+      ? this.agents.get(this.lastSpeakerId)
       : null;
     const lastStance = lastSpeaker?.stance ?? "";
 
     const sorted = [...candidates].sort((a, b) => {
       const oppA = this.computeStanceOpposition(
-        a.entry.stance,
+        a.agent.stance,
         lastStance,
       );
       const oppB = this.computeStanceOpposition(
-        b.entry.stance,
+        b.agent.stance,
         lastStance,
       );
-      return oppB - oppA; /* descending — highest opposition first */
+      return oppB - oppA;
     });
 
     return sorted[0];
   }
 
-  /**
-   * Compute how opposed two stances are.
-   * Currently binary: 0 = same stance, 1 = different.
-   * Future: could use semantic similarity / embedding distance.
-   */
   private computeStanceOpposition(
     stance1: string,
     stance2: string,
@@ -284,13 +308,50 @@ export class Scheduler extends EventEmitter {
   }
 
   /**
-   * Format the current transcript as a readable history string
-   * for the AI prompt context.
+   * Broadcast AGENT_STATUS_CHANGE for affected agents.
    */
-  private formatTranscript(): string {
-    if (this.transcript.length === 0) return "";
-    return this.transcript
-      .map((t) => `[${t.speaker}]: ${t.content}`)
-      .join("\n");
+  private broadcastAgentStatus(agents: AgentBrain[]): void {
+    const payloads = agents.map((a) => ({
+      expertId: a.expertId,
+      expertName: a.expertName,
+      state: a.state,
+      publicThought: a.publicThought,
+    }));
+    this.emit(WS_EVENT.AGENT_STATUS_CHANGE, payloads);
+  }
+
+  /**
+   * Asynchronously extract consensus/divergence and broadcast.
+   * Fire-and-forget — failures are logged but don't block the tick.
+   */
+  private extractAndBroadcastConsensus(): void {
+    const text = this.contextManager.buildHistory(this.transcript);
+    if (!text) return;
+
+    extractConsensus(text)
+      .then((result) => {
+        if (result.consensus.length > 0) {
+          this.emit(WS_EVENT.CONSENSUS_NEW, {
+            items: result.consensus.map((c) =>
+              typeof c === "string" ? c : String(c),
+            ),
+          });
+        }
+        if (result.divergences.length > 0) {
+          this.emit(WS_EVENT.DIVERGENCE_NEW, {
+            items: result.divergences.map((d) =>
+              typeof d === "string"
+                ? d
+                : `${(d as { topic: string }).topic}: ${((d as { positions: string[] }).positions ?? []).join(" vs ")}`,
+            ),
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(
+          "[Scheduler] consensus extraction failed:",
+          (err as Error).message,
+        );
+      });
   }
 }

@@ -1,0 +1,48 @@
+erDiagram
+    Discussion ||--o{ Participant : has
+    Discussion ||--o{ TranscriptEntry : contains
+    Discussion ||--o{ ConsensusItem : generates
+    Discussion ||--o{ DivergenceItem : generates
+    Participant ||--o{ TranscriptEntry : speaks
+
+    Discussion {
+        string id PK "UUID"
+        string topic "讨论话题"
+        enum status "DRAFT|CONFIRMED|ONGOING|ENDED"
+        string config "JSON配置"
+        datetime created_at
+        datetime updated_at
+    }
+
+    Participant {
+        string id PK "UUID"
+        string discussion_id FK
+        string name "姓名"
+        enum role "HOST|EXPERT"
+        string title "头衔"
+        string stance "立场"
+        string color "色值"
+    }
+
+    TranscriptEntry {
+        string id PK "UUID"
+        string discussion_id FK
+        string speaker_id FK
+        string content "发言内容"
+        datetime timestamp
+    }
+
+    ConsensusItem {
+        string id PK "UUID"
+        string discussion_id FK
+        string content "共识内容"
+        datetime generated_at
+    }
+
+    DivergenceItem {
+        string id PK "UUID"
+        string discussion_id FK
+        string content "分歧内容"
+        string involved_participants "JSON数组"
+        datetime generated_at
+    }
