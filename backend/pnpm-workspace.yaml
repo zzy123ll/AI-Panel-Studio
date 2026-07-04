@@ -1,5 +1,6 @@
 allowBuilds:
   '@prisma/engines': true
+  esbuild: true
   prisma: true
   sqlite3: true
   unrs-resolver: true

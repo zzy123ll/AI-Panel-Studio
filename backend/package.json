@@ -36,12 +36,16 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/express-serve-static-core": "^5.1.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.1.0",
     "jest": "^30.4.2",
     "prisma": "^7.8.0",
     "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
+    "tsx": "^4.22.5",
     "typescript": "^6.0.3"
   }
 }
