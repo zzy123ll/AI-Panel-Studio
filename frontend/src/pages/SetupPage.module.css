@@ -1,0 +1,163 @@
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg) var(--space-xl);
+  overflow-y: auto;
+}
+
+/* ── Header ─────────────────────── */
+
+.backLink {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: fit-content;
+  transition: color 0.2s;
+}
+
+.backLink:hover {
+  color: var(--text-primary);
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: var(--space-xl);
+}
+
+/* ── Form ───────────────────────── */
+
+.form {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  flex-shrink: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--primary-bg);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  border-color: var(--host-color);
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.slider {
+  flex: 1;
+  accent-color: var(--host-color);
+  height: 6px;
+}
+
+.sliderValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--host-color);
+  min-width: 24px;
+  text-align: center;
+}
+
+.generateBtn {
+  padding: 12px 0;
+  border-radius: var(--radius-md);
+  background: var(--host-color);
+  color: #0f1117;
+  font-weight: 700;
+  font-size: 15px;
+  transition: opacity 0.2s;
+}
+
+.generateBtn:hover {
+  opacity: 0.85;
+}
+
+/* ── Guest Panel ────────────────── */
+
+.panel {
+  margin-top: var(--space-lg);
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.guestGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-md);
+}
+
+.guestCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.colorBar {
+  height: 4px;
+  border-radius: 2px;
+  margin-bottom: var(--space-xs);
+}
+
+.guestName {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.guestTitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.stanceTag {
+  display: inline-block;
+  margin-top: var(--space-xs);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  align-self: flex-start;
+}
