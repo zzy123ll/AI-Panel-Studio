@@ -1,0 +1,189 @@
+/* ═══════════════════════════════════════════════════════
+   Studio Layout — CSS Grid (1fr + 400px)
+   ═══════════════════════════════════════════════════════ */
+
+.layout {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+}
+
+/* ── Left Column ─────────────────── */
+
+.left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--space-md) var(--space-lg);
+  gap: var(--space-md);
+}
+
+/* ── Main Stage ──────────────────── */
+
+.stage {
+  flex-shrink: 0;
+  background: var(--card-bg);
+  border: 2px solid var(--host-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: 0 0 24px rgba(240, 180, 41, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.stageLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--host-color);
+}
+
+.stageSpeaker {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stageStance {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.stageBubble {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--primary-bg);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border-left: 3px solid var(--host-color);
+}
+
+/* ── Panelist Grid ───────────────── */
+
+.panelGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-sm);
+  overflow-y: auto;
+  align-content: start;
+}
+
+.panelLabel {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -4px;
+  flex-shrink: 0;
+}
+
+/* ── Right Sidebar ───────────────── */
+
+.right {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border-color);
+  background: var(--primary-bg);
+}
+
+.transcriptSection {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.boardSection {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  flex-shrink: 0;
+  background: var(--primary-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sectionBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+/* ── Bottom Tab Bar + Mobile Panel ── */
+
+.mobilePanel {
+  display: none;
+}
+
+.tabBar {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Responsive: < 1024px
+   ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .right {
+    display: none;
+  }
+
+  .mobilePanel {
+    display: block;
+    overflow-y: auto;
+    padding: var(--space-sm);
+  }
+
+  .tabBar {
+    display: flex;
+    border-top: 1px solid var(--border-color);
+    background: var(--card-bg);
+  }
+
+  .tab {
+    flex: 1;
+    padding: var(--space-sm) 0;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .tabActive {
+    color: var(--host-color);
+    border-bottom-color: var(--host-color);
+  }
+
+  .mobilePanel {
+    height: 100%;
+    overflow-y: auto;
+    padding: var(--space-sm);
+  }
+}

@@ -1,0 +1,60 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.entry {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.entry:hover {
+  border-color: var(--border-color);
+}
+
+/* ── Color Swatch ───────────────── */
+
+.swatch {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+/* ── Body ───────────────────────── */
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.speaker {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.time {
+  color: var(--text-secondary);
+}
+
+.content {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
