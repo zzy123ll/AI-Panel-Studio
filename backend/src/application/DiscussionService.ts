@@ -21,7 +21,10 @@ export class DiscussionService {
   ): Promise<(Discussion & { participants: Participant[]; transcriptEntries: TranscriptEntry[] }) | null> {
     return prisma.discussion.findUnique({
       where: { id },
-      include: { participants: true, transcriptEntries: true },
+      include: {
+        participants: true,
+        transcriptEntries: { orderBy: { timestamp: "asc" } },
+      },
     });
   }
 
