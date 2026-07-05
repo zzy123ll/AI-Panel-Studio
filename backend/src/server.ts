@@ -260,9 +260,14 @@ app.post("/api/discussions/:id/generate", async (req, res) => {
     return;
   }
 
+  /* Check if a host already exists — don't generate a second one */
+  const hasHost = discussion.participants.some((p) => p.role === "HOST");
+
   let members;
   try {
-    members = await panelGenerationService.generate(discussion.topic, count);
+    members = await panelGenerationService.generate(discussion.topic, count, {
+      skipHost: hasHost,
+    });
   } catch (err) {
     console.error("[api] generatePanel failed:", (err as Error).message);
     res.status(500).json({

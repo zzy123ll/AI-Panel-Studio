@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   createDiscussion,
@@ -38,6 +38,10 @@ export default function SetupPage() {
       ? { phase: "input_topic" }
       : { phase: "generate_panel", discussionId: paramId!, topic: "", existingPanelists: [], status: "DRAFT" },
   );
+
+  /* Ref always holds the latest pageState to avoid stale closure issues */
+  const pageStateRef = useRef(pageState);
+  pageStateRef.current = pageState;
 
   /* Load existing discussion if editing a draft */
   useEffect(() => {
@@ -144,21 +148,30 @@ export default function SetupPage() {
   }, [pageState, count]);
 
   const handleDeleteParticipant = useCallback(async (participantId: string) => {
+    console.log("[SetupPage] handleDeleteParticipant fired, id:", participantId);
     setDeleting(participantId);
+
+    const currentPhase = pageStateRef.current.phase;
+    console.log("[SetupPage] current phase:", currentPhase);
+
     try {
       const res = await removeParticipant(participantId);
+      console.log("[SetupPage] removeParticipant response:", res);
+
       if (res.success) {
-        if (pageState.phase === "generate_panel") {
+        if (currentPhase === "generate_panel") {
           setPageState((prev) => {
             if (prev.phase !== "generate_panel") return prev;
             const filtered = prev.existingPanelists.filter((p) => p.id !== participantId);
+            console.log("[SetupPage] generate_panel: filtered", prev.existingPanelists.length, "→", filtered.length);
             if (filtered.length > 0) setCount(filtered.length);
             return { ...prev, existingPanelists: filtered };
           });
-        } else if (pageState.phase === "panel_ready") {
+        } else if (currentPhase === "panel_ready") {
           setPageState((prev) => {
             if (prev.phase !== "panel_ready") return prev;
             const filtered = prev.panelists.filter((p) => p.id !== participantId);
+            console.log("[SetupPage] panel_ready: filtered", prev.panelists.length, "→", filtered.length);
             if (filtered.length === 0) {
               return {
                 phase: "generate_panel" as const,
@@ -172,14 +185,16 @@ export default function SetupPage() {
           });
         }
       } else {
-        console.error("删除嘉宾失败:", res.error);
+        console.error("[SetupPage] 删除嘉宾API失败:", res.error);
+        alert(`删除失败: ${res.error ?? "未知错误"}`);
       }
     } catch (err) {
-      console.error("删除嘉宾失败:", (err as Error).message);
+      console.error("[SetupPage] 删除嘉宾异常:", err);
+      alert(`删除异常: ${(err as Error).message}`);
     } finally {
       setDeleting(null);
     }
-  }, [pageState.phase]);
+  }, []);
 
   const handleUseExisting = useCallback(async () => {
     if (pageState.phase !== "generate_panel") return;

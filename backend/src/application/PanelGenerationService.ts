@@ -18,6 +18,7 @@ export class PanelGenerationService {
   async generate(
     topic: string,
     count: number,
+    options?: { skipHost?: boolean },
   ): Promise<
     Array<{
       name: string;
@@ -29,9 +30,11 @@ export class PanelGenerationService {
   > {
     const result = await generatePanel(topic, count);
 
+    const skipHost = options?.skipHost ?? false;
+
     return result.panel.map((member, index) => ({
       name: member.name,
-      role: index === 0 ? "HOST" : "EXPERT",
+      role: skipHost ? "EXPERT" : (index === 0 ? "HOST" : "EXPERT"),
       title: member.title,
       stance: member.stance,
       color: EXPERT_COLORS[index % EXPERT_COLORS.length],
