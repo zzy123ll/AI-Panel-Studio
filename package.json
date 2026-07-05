@@ -11,6 +11,7 @@
     "db:setup": "cd backend && pnpm db:generate && pnpm db:migrate --name init && pnpm db:seed",
     "db:seed": "cd backend && pnpm db:seed",
     "test": "cd backend && pnpm test",
+    "test:cli": "cd backend && pnpm test:cli",
     "test:e2e": "cd frontend && pnpm exec playwright test"
   },
   "devDependencies": {

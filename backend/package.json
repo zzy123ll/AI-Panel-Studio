@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "test": "jest --no-coverage",
+    "test:cli": "tsx scripts/cli-test.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
@@ -44,6 +45,7 @@
     "@types/node": "^26.1.0",
     "jest": "^30.4.2",
     "prisma": "^7.8.0",
+    "socket.io-client": "^4.8.3",
     "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.5",

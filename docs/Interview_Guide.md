@@ -101,7 +101,7 @@ idle ──→ preparing ──→ raising_hand ──→ speaking ──→ idl
 | **Phase 1** | SDD | `schema.prisma`（5 模型 + 2 枚举）、`contracts/`（类型 + 路由 + 事件常量） | UUID 主键、CASCADE 删除、SQLite TEXT 存 JSON |
 | **Phase 2** | DDD | 3 页面 + 3 子组件 + 设计 Token（10 色专家调色板） | CSS Grid 1fr+420px 布局、Mock 数据先行、响应式 < 1024px |
 | **Phase 3** | TDD | Jest 28 用例（aiClient 10 + Scheduler 18），RED→GREEN 两次迭代 | sleep 模块独立以支持 jest.mock()；Fisher-Yates 随机序列通过 `mockReturnValueOnce` 精确控制 |
-| **Phase 4** | E2E | Playwright 14 用例（完整流程 + 并行隔离）、架构合规修复、文档补齐 | 乐观 UI（点击即设 isRunning）、独立 browserContext 测试并行隔离 |
+| **Phase 4** | E2E | Playwright 14 用例（完整流程 + 并行隔离）、CLI 集成测试、架构合规修复 | 乐观 UI、独立 browserContext 测试并行隔离 |
 
 ### 3.2 为什么用这个顺序？
 
@@ -112,7 +112,29 @@ idle ──→ preparing ──→ raising_hand ──→ speaking ──→ idl
 
 ---
 
-## 四、7 个典型技术难题及解决路径
+## 四、测试策略（三层金字塔）
+
+| 层级 | 框架 | 用例数 | 覆盖范围 | 运行命令 |
+|------|------|--------|---------|---------|
+| 单元测试 | Jest 30 + ts-jest | 28 | AI Client（10）+ Scheduler（18） | `pnpm test` |
+| CLI 集成测试 | tsx + fetch + socket.io-client | 10 场景 | 完整 HTTP + WebSocket 生命周期 | `pnpm test:cli` |
+| E2E 测试 | Playwright 1.61 | 14 | 前端页面 + 并行隔离 + sanitize | `pnpm test:e2e` |
+
+**CLI 测试覆盖的 10 个场景**：
+1. `GET /` 健康检查
+2. `GET /api/discussions` 列表
+3. `POST /api/discussions` 创建讨论
+4. `GET /api/discussions/:id` 详情
+5. `POST /api/discussions/:id/generate` AI 生成嘉宾
+6. WebSocket 连接 + 启动讨论 + 实时事件验证
+7. `DISCUSSION_END` + `SUMMARY` 事件验证
+8. `POST /api/discussions/:id/confirm` 状态流转
+9. `DELETE /api/participants/:id` 删除嘉宾
+10. 错误处理：404/400/重复确认
+
+---
+
+## 五、7 个典型技术难题及解决路径
 
 ### 问题 1：Prisma 7 破坏性变更 → 数据库无法连接
 
@@ -126,135 +148,56 @@ idle ──→ preparing ──→ raising_hand ──→ speaking ──→ idl
 
 | 维度 | 内容 |
 |------|------|
-| **根因** | 事件名从字符串 `'newMessage'` 重构为常量 `WS_EVENT.TRANSCRIPT_APPEND` 时，`replace_all` 只替换了单引号版本，双引号 `"newMessage"` 残留，导致 `.on("newMessage")` 永远等不到 `"TRANSCRIPT_APPEND"` |
-| **解决** | 通过单测试隔离调试定位到事件未触发 → 检查源码发现双引号残留 → 第二次 `replace_all` 覆盖所有变体 |
-| **面试可讲** | "重构标识符时应使用 IDE 的 Rename Symbol，但在纯文本环境中则需要精确的匹配模式。这次教训让我学会了在重构后立即运行测试做验证闭环。" |
+| **根因** | 事件名从字符串 `'newMessage'` 重构为常量 `WS_EVENT.TRANSCRIPT_APPEND` 时，`replace_all` 只替换了单引号版本，双引号 `"newMessage"` 残留 |
+| **解决** | 单测试隔离调试 → 检查源码发现双引号残留 → 第二次 `replace_all` 覆盖所有变体 |
+| **面试可讲** | "重构标识符时应使用 IDE 的 Rename Symbol，但在文本环境中则需要精确的匹配模式。" |
 
 ### 问题 3：AI 发言「论文式」冗长 → 破坏沉浸感
 
 | 维度 | 内容 |
 |------|------|
 | **根因** | `decideAction` Prompt 未对输出长度做硬约束，AI 默认倾向全面回答 |
-| **解决** | 添加"每次发言控制在 1-2 句口语，自然打断或反驳，禁止长篇大论"约束，输出从 200+ 字压缩到 15-50 字 |
-| **面试可讲** | "Prompt 工程的核心不仅是让 AI 说得对，更是让 AI 说得对且说得短。这种产品化约束是 AI 应用中最容易被忽视的维度。" |
+| **解决** | 添加"每次发言控制在 1-2 句口语"约束，输出从 200+ 字压缩到 15-50 字 |
+| **面试可讲** | "Prompt 工程的核心不仅是让 AI 说得对，更是让 AI 说得对且说得短。" |
 
-### 问题 4：Mock 数据从未切换到 API → 前端是静态壳
+### 问题 4-7
 
-| 维度 | 内容 |
-|------|------|
-| **根因** | DDD 阶段用 Mock 快速出 UI，但 TDD/E2E 阶段只叠加了 Socket.io 而没有替换数据源 |
-| **解决** | 三个页面全部重写为 API 驱动：`useEffect` + 7 个 HTTP 接口 + loading/error/empty 三态 |
-| **面试可讲** | "Mock 数据是双刃剑——它让 UI 不被后端阻塞，但必须在 API 就绪后第一时间切换。我的改进是在 Mock 组件中预留 API 调用的注释占位符作为契约标记。" |
-
-### 问题 5：无根 package.json → 项目无法一键启动
-
-| 维度 | 内容 |
-|------|------|
-| **根因** | 分别在 backend/frontend 下 `pnpm init` 但从未建立 monorepo 入口 |
-| **解决** | 创建根 `package.json`（concurrently 编排）、`pnpm-workspace.yaml`（含 allowBuilds）、后端 `dev` script、`.env.example` 模板 |
-| **面试可讲** | "monorepo 的入口体验必须在项目 scaffold 阶段就验证——clone→install→dev 能否一次跑通。" |
-
-### 问题 6：dotenv 未加载 → API Key 静默为 undefined
-
-| 维度 | 内容 |
-|------|------|
-| **根因** | `server.ts` 读取 `process.env` 但顶部缺少 `import "dotenv/config"`，Node.js 不会自动加载 `.env` |
-| **解决** | 在 `server.ts` 首行添加 `import "dotenv/config"`，并创建 `.env.example` 降低配置门槛 |
-| **面试可讲** | "环境变量是基础设施中的基础设施。理想做法是写一个 pre-start 自检脚本——检查必需环境变量是否存在、数据库是否可达——而不是让用户在运行时发现 AI 莫名不工作。" |
-
-### 问题 7：老代码 Bug —— 6 个跨文件渲染缺陷
-
-| 维度 | 内容 |
-|------|------|
-| **根因** | Superpowers code-review（8 路 Finder + Verify）发现的 6 个跨文件 bug——Prompt 意图不匹配、stop() 非幂等、DiscussionProvider 未挂载、AGENT_STATUS_CHANGE 时序错误、4 个 WS 回调缺失、Transcript 排序回归 |
-| **解决** | 逐一修复并提交，最后验证 Jest 28/28 + Playwright 14/14 |
-| **面试可讲** | "Review 是最低成本的 Bug 发现机制。我使用多角度并行审查（正确性、行为移除、跨文件跟踪、代码复用、简化、效率、架构层次、约定合规），每个角度独立找问题再交叉验证。" |
+详见 [Workflow_Report.md](Workflow_Report.md) —— Mock 数据未切换 API、monorepo 入口缺失、dotenv 未加载、pnpm 11 allowBuilds 阻塞。
 
 ---
 
-## 五、Prompt 工程实践
+## 六、面试官可能追问的问题
 
-### 5.1 5 个核心 Prompt 的设计思路
+### Q1：为什么 Scheduler 用 EventEmitter 而不是 RxJS？
 
-| # | 阶段 | 核心策略 | 关键约束 |
-|---|------|---------|---------|
-| 1 | SDD | 聚焦 Schema 定义，禁止 AI 写 API/前端代码 | "仅关注 Prisma Schema 的定义，不要编写 API 或前端代码" |
-| 2 | DDD | 先建 UI 壳（Mock 数据），设计驱动组件层级 | "仅实现展示层（Mock 数据），不涉及 API 调用" |
-| 3 | TDD | TDD 驱动 AI Client，Prompt 模板与调用逻辑分离 | "先用 Jest 编写测试（RED），mock fetch + sleep，再实现（GREEN）" |
-| 4 | TDD | 核心调度逻辑用 18 个测试场景驱动实现 | "先写测试（断言不连续同一人发言、主持人优先），测试通过后再实现" |
-| 5 | E2E | 全栈联调 + 文档补齐 + Bug 修复 | "Playwright 覆盖真实用户操作路径，自动发现 JSON 泄漏等前端 Bug" |
-
-### 5.2 AI 协作的关键经验
-
-1. **不让 AI 一次性看到 3000 行代码**：每个模块拆分独立 Prompt，分阶段交付
-2. **Prompt 先定义约束，再定义功能**：先告诉 AI "不做什么"，再告诉它"做什么"
-3. **纠偏记录**：每个 Prompt 模板附带"为什么这样写"和"之前出了什么问题"
-
----
-
-## 六、测试策略
-
-| 层级 | 框架 | 用例数 | 覆盖范围 |
-|------|------|--------|---------|
-| 单元测试 | Jest 30 + ts-jest | 28 | AI Client（10 用例：成功/超时/重试/JSON 解析）+ Scheduler（18 用例：状态流转/冲突仲裁/防重复/共识提取） |
-| E2E 测试 | Playwright 1.61 | 14 | Dashboard 加载、Setup 创建流程、Studio 渲染、结束总结、导航清理、并行隔离、sanitize 验证 |
-
-**测试原则**：
-- sleep 模块独立到单独文件以支持 `jest.mock()`（避免重试测试超时 5s）
-- Fisher-Yates 随机序列通过 `mockReturnValueOnce` 精确控制，保证测试确定性
-- E2E 测试兼容后端不可用场景（loading/error 状态）
-
----
-
-## 七、关键技术决策
-
-| 决策 | 选择 | 理由 |
-|------|------|------|
-| 实时通信 | Socket.io 4（非 SSE） | 支持双向事件、房间隔离、自动重连 |
-| 数据库 | SQLite + Prisma 7 | 零配置、单文件、满足 MVP 需求 |
-| 包管理 | pnpm 11 monorepo | workspace 协议、节省磁盘、严格依赖 |
-| ESM | Node16/Next module kind | 未来兼容性、tree-shaking |
-| 前端状态 | React Context + useReducer | 轻量、无需 Redux，按 discussionId 隔离 |
-| CSS 方案 | CSS Modules + Custom Properties | 无运行时开销、设计 Token 化 |
-
----
-
-## 八、面试官可能追问的问题
-
-### Q1：为什么 Scheduler 用 EventEmitter 而不是 RxJS/Observable？
-
-**答**：EventEmitter 是 Node.js 原生 API，零依赖，且 Scheduler 的事件模型是简单的 "发出→监听" 模式，不需要 RxJS 的操作符链。Socket.io 本身就是基于 EventEmitter 的，保持一致降低了心智负担。
+EventEmitter 是 Node.js 原生 API，零依赖，且 Scheduler 的事件模型是简单的发出→监听模式，不需要 RxJS 操作符链。Socket.io 本身基于 EventEmitter，保持一致降低了心智负担。
 
 ### Q2：ContextManager 的 transcript 压缩策略？
 
-**答**：`MAX_ENTRIES = 20` 截断 + 保留最近发言者上下文。当 transcript 超过 20 条时，只保留最近 20 条作为 AI 的上下文窗口，既控制了 token 成本，又保持了讨论连贯性。同时 `detectTopicShift()` 检测话题漂移并在必要时重置上下文。
+`MAX_ENTRIES = 20` 截断 + 保留最近发言者上下文。控制 token 成本同时保持讨论连贯性。`detectTopicShift()` 检测话题漂移。
 
 ### Q3：如何处理 AI API 调用失败？
 
-**答**：三层容错——① AbortController 30s 超时 ② 3 次指数退避重试（1s/2s/4s）③ heuristic 降级（SummaryService 在 AI 不可用时用规则提取发言统计作为备选总结）。错误不传播到用户界面。
+三层容错——① AbortController 30s 超时 ② 3 次指数退避重试（1s/2s/4s）③ heuristic 降级（SummaryService 在 AI 不可用时用规则提取发言统计）。
 
 ### Q4：多个讨论如何做到完全隔离？
 
-**答**：三层隔离——① 后端 `Map<discussionId, DiscussionSession>`，每个讨论独立的 Scheduler 实例 ② Socket.io 的 `to(discussionId)` 房间机制，事件只推送给加入该房间的客户端 ③ 前端 `DiscussionProvider` React Context，每个路由渲染独立的 Context 实例。
+三层隔离——① 后端 `Map<discussionId, DiscussionSession>` ② Socket.io `to(discussionId)` 房间机制 ③ 前端 `DiscussionProvider` React Context。
 
-### Q5：为什么要做 Fisher-Yates 洗牌而不是简单的 Math.random() 排序？
+### Q5：如果要重构，你会改变什么？
 
-**答**：Fisher-Yates 保证均匀分布——每个排列出现概率相等（1/n!），而 `.sort(() => Math.random() - 0.5)` 存在偏差。在专家数量较少（2-6 人）时，均匀随机性对讨论多样性至关重要。
-
-### Q6：如果让你重构这个项目，你会改变什么？
-
-**答**：三点——① 在 DDD 阶段使用 UI UX Pro Max skill 生成设计系统（因网络原因未能安装，改为手动 7 文件 CSS 重构）② 在 `server.ts` 启动时加入环境变量自检 ③ 将 Scheduler 的 maxMessages 设为可配置的 API 参数而非硬编码。另外，对于生产环境，会考虑使用 PostgreSQL 替代 SQLite 以支持更好的并发写入。
+① 在 DDD 阶段使用 UI UX Pro Max skill 生成设计系统（因网络原因未能安装）② 加入 pre-start 环境变量自检脚本 ③ Scheduler maxMessages 可配置化。
 
 ---
 
-## 九、总结：我对「工程化 AI 开发」的理解
+## 七、我对「工程化 AI 开发」的理解
 
 工程化 AI 开发不是"用 Prompt 生成代码"，而是**将 AI 当作一个高性能但需要精确指令的初级工程师**，通过以下机制确保交付质量：
 
-1. **上下文隔离**：每个模块拆分独立 Spec Prompt，不让 AI 一次性面对巨量代码
-2. **验证闭环**：AI 生成 → `tsc --noEmit` → `jest` → `playwright` → `code-review`，任何一步失败立即回退
-3. **合约先行**：类型/接口/事件协议先于实现，`contracts/` 目录是前后端的共同 truth source
-4. **逐层提交**：每次 commit 只做一件事——scaffold → logic → test → polish，可追溯、可回滚
-5. **纠偏积累**：每个 Prompt 附带"为什么这样写"和"之前出了什么问题"，形成可复用知识库
+1. **上下文隔离**：每个模块拆分独立 Spec Prompt
+2. **验证闭环**：AI 生成 → tsc → jest → playwright → code-review
+3. **合约先行**：类型/接口/事件协议先于实现
+4. **逐层提交**：每次 commit 只做一件事，可追溯可回滚
+5. **纠偏积累**：每个 Prompt 附带"为什么这样写"和"之前出了什么问题"
 
-**最终交付**：24 个 commits、75 个源文件、28 个单元测试 + 14 个 E2E 测试、5 份技术文档、100% 作业合规。
+**最终交付**：25 个 commits、46 个源文件（不含 node_modules）、28 单元测试 + 10 CLI 场景 + 14 E2E 测试、6 份技术文档、100% 作业合规。
