@@ -1,16 +1,16 @@
-# API Reference — AI Panel Studio
+# API 参考文档 — AI Panel Studio
 
-Base URL: `http://localhost:3001/api`
+基础地址: `http://localhost:3001/api`
 
 ---
 
-## Discussions
+## 讨论接口
 
 ### `GET /discussions`
 
-List all discussions, ordered by creation time (desc).
+获取所有讨论列表，按创建时间倒序排列。
 
-**Response**:
+**响应**:
 ```json
 {
   "success": true,
@@ -30,69 +30,69 @@ List all discussions, ordered by creation time (desc).
 
 ### `POST /discussions`
 
-Create a new discussion.
+创建新讨论。
 
-**Body**: `{ "topic": "string" }`
+**请求体**: `{ "topic": "string" }`
 
-**Response**: `201 Created` — Discussion object with `status: "DRAFT"`
+**响应**: `201 Created` — 讨论对象，`status` 为 `"DRAFT"`
 
 ### `GET /discussions/:id`
 
-Get a discussion with participants and transcript entries.
+获取单个讨论详情，包含嘉宾列表和转录记录。
 
 ### `POST /discussions/:id/generate`
 
-Call the AI to generate a guest panel. Requires `DEEPSEEK_API_KEY`.
+调用 AI 生成嘉宾阵容。需要配置 `DEEPSEEK_API_KEY`。
 
-**Body** (optional): `{ "count": 4 }`
+**请求体**（可选）: `{ "count": 4 }`
 
-**Status flow**: `DRAFT → CONFIRMED`
+**状态流转**: `DRAFT → CONFIRMED`
 
-**Response**: `{ "success": true, "data": { "participants": [...] } }`
+**响应**: `{ "success": true, "data": { "participants": [...] } }`
 
 ### `POST /discussions/:id/start`
 
-Initialize the discussion scheduler. Discussion must be in `CONFIRMED` status.
+启动讨论调度器。讨论必须处于 `CONFIRMED` 状态。
 
-**Status flow**: `CONFIRMED → ONGOING`
-
----
-
-## WebSocket Protocol
-
-Connection: `ws://localhost:3001/studio`
-
-### Client → Server
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `JOIN` | `string (discussionId)` | Join discussion room |
-| `CLIENT_CONFIRM` | `string (discussionId)` | Start scheduler |
-| `CLIENT_STOP` | `string (discussionId)` | Stop scheduler |
-
-### Server → Client
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `TRANSCRIPT_APPEND` | `{ discussionId, speakerId, speakerName, content, intent, timestamp }` | New speech |
-| `CONSENSUS_NEW` | `{ discussionId, items: string[], isFinal?: boolean }` | Consensus extracted |
-| `DIVERGENCE_NEW` | `{ discussionId, items: string[], isFinal?: boolean }` | Divergence identified |
-| `AGENT_STATUS_CHANGE` | `{ discussionId, agents: [{ expertId, expertName, state, publicThought }] }` | Expert state change |
-| `DISCUSSION_END` | `{ discussionId, topic, transcriptCount }` | Discussion ended |
-| `HISTORY` | `{ discussionId, entries: [...] }` | Past transcript (on join) |
-| `CONFIRMED` | `{ discussionId, running: true }` | Start acknowledged |
-| `STOPPED` | `{ discussionId, running: false }` | Stop acknowledged |
-| `ERROR` | `{ message: string }` | Error notification |
+**状态流转**: `CONFIRMED → ONGOING`
 
 ---
 
-## Response Envelope
+## WebSocket 协议
 
-All HTTP responses use:
+连接地址: `ws://localhost:3001/studio`
+
+### 客户端 → 服务端
+
+| 事件 | 载荷 | 说明 |
+|-------|---------|-------------|
+| `JOIN` | `string (discussionId)` | 加入讨论房间 |
+| `CLIENT_CONFIRM` | `string (discussionId)` | 确认启动调度器 |
+| `CLIENT_STOP` | `string (discussionId)` | 停止调度器 |
+
+### 服务端 → 客户端
+
+| 事件 | 载荷 | 说明 |
+|-------|---------|-------------|
+| `TRANSCRIPT_APPEND` | `{ discussionId, speakerId, speakerName, content, intent, timestamp }` | 新发言推送 |
+| `CONSENSUS_NEW` | `{ discussionId, items: string[], isFinal?: boolean }` | 共识提炼 |
+| `DIVERGENCE_NEW` | `{ discussionId, items: string[], isFinal?: boolean }` | 分歧识别 |
+| `AGENT_STATUS_CHANGE` | `{ discussionId, agents: [{ expertId, expertName, state, publicThought }] }` | 专家状态变更 |
+| `DISCUSSION_END` | `{ discussionId, topic, transcriptCount }` | 讨论结束通知 |
+| `HISTORY` | `{ discussionId, entries: [...] }` | 历史转录（加入房间时发送） |
+| `CONFIRMED` | `{ discussionId, running: true }` | 启动确认 |
+| `STOPPED` | `{ discussionId, running: false }` | 停止确认 |
+| `ERROR` | `{ message: string }` | 错误通知 |
+
+---
+
+## 响应信封
+
+所有 HTTP 响应统一采用以下格式：
 ```json
 {
   "success": true | false,
   "data": { ... },
-  "error": "error message (on failure)"
+  "error": "错误信息（失败时返回）"
 }
 ```

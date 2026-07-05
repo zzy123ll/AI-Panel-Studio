@@ -122,13 +122,16 @@ function wireSchedulerEvents(
   );
 
   /* Discussion end */
-  scheduler.on(WS_EVENT.DISCUSSION_END, (payload: { topic: string; transcriptCount: number }) => {
-    discussionService.end(discussionId).catch((err) =>
+  scheduler.on(WS_EVENT.DISCUSSION_END, async (payload: { topic: string; transcriptCount: number }) => {
+    /* Persist ENDED status before notifying clients */
+    try {
+      await discussionService.end(discussionId);
+    } catch (err) {
       console.error(
         `[scheduler] end persist error disc=${discussionId}:`,
         (err as Error).message,
-      ),
-    );
+      );
+    }
 
     io.of("/studio").to(discussionId).emit(WS_EVENT.DISCUSSION_END, {
       discussionId,
@@ -374,6 +377,13 @@ studioNs.on("connection", (socket) => {
       console.log(`[ws] scheduler stopped for discussion ${discussionId}`);
       socket.emit(WS_EVENT.STOPPED, { discussionId, running: false });
     }
+  });
+
+  /* Client leaves a discussion room */
+  socket.on(WS_EVENT.LEAVE, (discussionId: string) => {
+    if (!discussionId || typeof discussionId !== "string") return;
+    socket.leave(discussionId);
+    console.log(`[ws] ${socket.id} left room ${discussionId}`);
   });
 
   socket.on("disconnect", () => {

@@ -153,6 +153,9 @@ export function useSocket({
     s.on(WS_EVENT.ERROR, handleError);
 
     return () => {
+      /* Leave room on cleanup (discussionId captured from this render's closure) */
+      s.emit(WS_EVENT.LEAVE, discussionId);
+
       s.off(WS_EVENT.TRANSCRIPT_APPEND, handleTranscript);
       s.off(WS_EVENT.HISTORY, handleHistory);
       s.off(WS_EVENT.CONFIRMED, handleConfirmed);

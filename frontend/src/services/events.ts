@@ -16,4 +16,5 @@ export const WS_EVENT = {
   JOIN: "JOIN",
   CLIENT_CONFIRM: "CLIENT_CONFIRM",
   CLIENT_STOP: "CLIENT_STOP",
+  LEAVE: "LEAVE",
 } as const;

@@ -46,6 +46,9 @@ export const WS_EVENT = {
 
   /** Client requests scheduler stop */
   CLIENT_STOP: "CLIENT_STOP",
+
+  /** Client leaves a discussion room */
+  LEAVE: "LEAVE",
 } as const;
 
 export type WsEventName = (typeof WS_EVENT)[keyof typeof WS_EVENT];
