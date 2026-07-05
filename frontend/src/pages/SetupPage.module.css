@@ -318,6 +318,8 @@
   transition: all 0.2s;
   padding: 0;
   line-height: 1;
+  position: relative;
+  z-index: 2;
 }
 
 .deleteBtn:hover {

@@ -148,39 +148,38 @@ export default function SetupPage() {
     try {
       const res = await removeParticipant(participantId);
       if (res.success) {
-        /* Remove from local state */
         if (pageState.phase === "generate_panel") {
-          const filtered = pageState.existingPanelists.filter((p) => p.id !== participantId);
-          setPageState({
-            ...pageState,
-            existingPanelists: filtered,
+          setPageState((prev) => {
+            if (prev.phase !== "generate_panel") return prev;
+            const filtered = prev.existingPanelists.filter((p) => p.id !== participantId);
+            if (filtered.length > 0) setCount(filtered.length);
+            return { ...prev, existingPanelists: filtered };
           });
-          if (filtered.length > 0) setCount(filtered.length);
         } else if (pageState.phase === "panel_ready") {
-          const filtered = pageState.panelists.filter((p) => p.id !== participantId);
-          if (filtered.length === 0) {
-            /* All deleted — go back to generate phase */
-            setPageState({
-              phase: "generate_panel",
-              discussionId: pageState.discussionId,
-              topic: pageState.topic,
-              existingPanelists: [],
-              status: "DRAFT",
-            });
-          } else {
-            setPageState({
-              ...pageState,
-              panelists: filtered,
-            });
-          }
+          setPageState((prev) => {
+            if (prev.phase !== "panel_ready") return prev;
+            const filtered = prev.panelists.filter((p) => p.id !== participantId);
+            if (filtered.length === 0) {
+              return {
+                phase: "generate_panel" as const,
+                discussionId: prev.discussionId,
+                topic: prev.topic,
+                existingPanelists: [],
+                status: "DRAFT",
+              };
+            }
+            return { ...prev, panelists: filtered };
+          });
         }
+      } else {
+        console.error("删除嘉宾失败:", res.error);
       }
     } catch (err) {
       console.error("删除嘉宾失败:", (err as Error).message);
     } finally {
       setDeleting(null);
     }
-  }, [pageState]);
+  }, [pageState.phase]);
 
   const handleUseExisting = useCallback(async () => {
     if (pageState.phase !== "generate_panel") return;
@@ -237,8 +236,12 @@ export default function SetupPage() {
           </div>
           {showDelete && (
             <button
+              type="button"
               className={styles.deleteBtn}
-              onClick={() => handleDeleteParticipant(guest.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteParticipant(guest.id);
+              }}
               disabled={isDeleting}
               title="移除此嘉宾"
             >
