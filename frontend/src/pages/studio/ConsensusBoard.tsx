@@ -15,6 +15,9 @@ export default function ConsensusBoard({ consensus, divergence }: Props) {
           <span className={`${styles.dot} ${styles.consensusDot}`} />
           共识
         </div>
+        {consensus.length === 0 && (
+          <p className={styles.empty}>讨论开始后将在此提炼共识</p>
+        )}
         {consensus.map((item) => (
           <div
             key={item.id}
@@ -31,6 +34,9 @@ export default function ConsensusBoard({ consensus, divergence }: Props) {
           <span className={`${styles.dot} ${styles.divergenceDot}`} />
           分歧
         </div>
+        {divergence.length === 0 && (
+          <p className={styles.empty}>讨论开始后将在此识别分歧</p>
+        )}
         {divergence.map((item) => (
           <div
             key={item.id}

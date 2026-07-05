@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { listDiscussions, type DiscussionResponse } from "../services/api.js";
-import { STATUS_COLOR, STATUS_LABEL, type DiscussionStatus } from "./dashboardData";
+import { STATUS_COLOR, STATUS_LABEL } from "./dashboardData";
+import type { DiscussionStatus } from "./dashboardData";
 import styles from "./DashboardPage.module.css";
 
 export default function DashboardPage() {
@@ -24,12 +25,43 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  /* Group: ONGOING first, then others */
+  const ongoing = discussions.filter((d) => d.status === "ONGOING");
+  const others = discussions.filter((d) => d.status !== "ONGOING");
+
+  const renderCard = (d: DiscussionResponse) => {
+    const status = d.status as DiscussionStatus;
+    const participantCount = d.participants?.length ?? 0;
+
+    return (
+      <Link
+        key={d.id}
+        to={status === "DRAFT" ? `/setup/${d.id}` : `/studio/${d.id}`}
+        className={styles.card}
+      >
+        <span
+          className={styles.statusTag}
+          style={{ backgroundColor: STATUS_COLOR[status] ?? "#607d8b" }}
+        >
+          {STATUS_LABEL[status] ?? status}
+        </span>
+
+        <p className={styles.cardTopic}>{d.topic}</p>
+
+        <div className={styles.cardMeta}>
+          <span>👥 {participantCount} 位嘉宾</span>
+          <span>{new Date(d.created_at).toLocaleDateString("zh-CN")}</span>
+        </div>
+      </Link>
+    );
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.title}>讨论面板</h1>
         <Link to="/setup/new" className={styles.newBtn}>
-          发起新讨论
+          ＋ 发起新讨论
         </Link>
       </header>
 
@@ -48,39 +80,36 @@ export default function DashboardPage() {
 
       {!loading && !error && discussions.length === 0 && (
         <div className={styles.empty}>
-          <p>暂无讨论</p>
+          <p>📭 暂无讨论</p>
           <Link to="/setup/new" className={styles.newBtn}>
-            发起第一个讨论
+            ＋ 发起第一个讨论
           </Link>
         </div>
       )}
 
-      {!loading && !error && (
-        <div className={`${styles.grid} scroll-container`}>
-          {discussions.map((d) => (
-            <Link
-              key={d.id}
-              to={d.status === "DRAFT" ? `/setup/${d.id}` : `/studio/${d.id}`}
-              className={styles.card}
-            >
-              <span
-                className={styles.statusTag}
-                style={{
-                  backgroundColor:
-                    STATUS_COLOR[d.status as DiscussionStatus] ?? "#607d8b",
-                }}
-              >
-                {STATUS_LABEL[d.status as DiscussionStatus] ?? d.status}
-              </span>
-
-              <p className={styles.cardTopic}>{d.topic}</p>
-
-              <div className={styles.cardMeta}>
-                <span>👥 {d.participants?.length ?? 0} 人</span>
-                <span>{new Date(d.created_at).toLocaleDateString("zh-CN")}</span>
+      {!loading && !error && discussions.length > 0 && (
+        <div className="scroll-container" style={{ flex: 1 }}>
+          {/* Ongoing discussions section */}
+          {ongoing.length > 0 && (
+            <>
+              <h2 className={styles.sectionTitle}>🟢 进行中的讨论</h2>
+              <div className={styles.grid}>
+                {ongoing.map(renderCard)}
               </div>
-            </Link>
-          ))}
+            </>
+          )}
+
+          {/* Other discussions */}
+          {others.length > 0 && (
+            <>
+              <h2 className={styles.sectionTitle} style={{ marginTop: ongoing.length > 0 ? "var(--space-xl)" : "0" }}>
+                📋 全部讨论
+              </h2>
+              <div className={styles.grid}>
+                {others.map(renderCard)}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

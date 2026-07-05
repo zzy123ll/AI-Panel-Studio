@@ -19,10 +19,7 @@
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 70%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
 }
 
 .newBtn {
@@ -39,6 +36,18 @@
 .newBtn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 20px rgba(245, 182, 66, 0.35);
+}
+
+/* ── Section titles ─────────────── */
+
+.sectionTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  letter-spacing: 0.02em;
 }
 
 /* ── Grid ───────────────────────── */

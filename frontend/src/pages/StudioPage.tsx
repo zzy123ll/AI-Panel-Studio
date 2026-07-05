@@ -93,14 +93,18 @@ export default function StudioPage() {
 
         /* Map existing transcript */
         if (d.transcriptEntries && d.transcriptEntries.length > 0) {
-          const lines: TranscriptLine[] = d.transcriptEntries.map((e) => ({
-            id: e.id,
-            speakerName:
-              d.participants.find((p) => p.id === e.speaker_id)?.name ?? "未知",
-            colorIndex: 0,
-            content: sanitizeAiText(e.content),
-            timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
-          }));
+          const lines: TranscriptLine[] = d.transcriptEntries.map((e) => {
+            const p = d.participants.find((p) => p.id === e.speaker_id);
+            return {
+              id: e.id,
+              speakerName: p?.name ?? "未知",
+              speakerTitle: p?.title ?? "",
+              colorIndex: 0,
+              color: p?.color,
+              content: sanitizeAiText(e.content),
+              timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
+            };
+          });
           setTranscript(lines);
         }
 
@@ -124,10 +128,16 @@ export default function StudioPage() {
 
   const handleTranscript = useCallback(
     (evt: TranscriptEvent) => {
+      /* Look up speaker title + color from panelist list */
+      const speaker = panelists.find((p) => p.id === evt.speakerId);
+      const speakerColor = panelists.find((p) => p.id === evt.speakerId)?.color;
+
       const newLine: TranscriptLine = {
         id: `t-${evt.timestamp}-${Math.random().toString(36).slice(2, 6)}`,
         speakerName: evt.speakerName,
+        speakerTitle: speaker?.title ?? "",
         colorIndex: 0,
+        color: speakerColor,
         content: sanitizeAiText(evt.content),
         timestamp: new Date(evt.timestamp).toLocaleTimeString("zh-CN"),
       };
@@ -168,15 +178,17 @@ export default function StudioPage() {
       if (payload.entries.length > 0 && transcript.length === 0) {
         const lines: TranscriptLine[] = payload.entries.map((e) => ({
           id: e.id,
-          speakerName: "",
+          speakerName: panelists.find((p) => p.id === e.speakerId)?.name ?? "",
+          speakerTitle: panelists.find((p) => p.id === e.speakerId)?.title ?? "",
           colorIndex: 0,
+          color: panelists.find((p) => p.id === e.speakerId)?.color,
           content: sanitizeAiText(e.content),
           timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
         }));
         setTranscript(lines);
       }
     },
-    [transcript.length],
+    [transcript.length, panelists],
   );
 
   const handleAgentStatus = useCallback(

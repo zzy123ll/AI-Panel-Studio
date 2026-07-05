@@ -52,10 +52,17 @@
   font-size: 12px;
 }
 
+.speakerTitle {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex: 1;
+}
+
 .time {
   color: var(--text-tertiary);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .content {
