@@ -243,3 +243,47 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Existing panelists notice ─── */
+
+.existingNotice {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(240, 180, 41, 0.1);
+  border: 1px solid rgba(240, 180, 41, 0.3);
+  font-size: 13px;
+  color: var(--host-color);
+  line-height: 1.5;
+}
+
+.existingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.existingCard {
+  background: var(--primary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.existingCard .colorBar {
+  height: 3px;
+  border-radius: 2px;
+  margin-bottom: 2px;
+}
+
+.existingName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.existingTitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+}

@@ -17,7 +17,7 @@ const EXPERT_COLORS = [
 type PageState =
   | { phase: "input_topic" }
   | { phase: "creating" }
-  | { phase: "generate_panel"; discussionId: string; topic: string }
+  | { phase: "generate_panel"; discussionId: string; topic: string; existingPanelists: ParticipantResponse[] }
   | { phase: "generating"; discussionId: string; topic: string }
   | { phase: "panel_ready"; discussionId: string; topic: string; panelists: ParticipantResponse[] }
   | { phase: "error"; message: string };
@@ -32,7 +32,7 @@ export default function SetupPage() {
   const [pageState, setPageState] = useState<PageState>(
     isNew
       ? { phase: "input_topic" }
-      : { phase: "generate_panel", discussionId: paramId!, topic: "" },
+      : { phase: "generate_panel", discussionId: paramId!, topic: "", existingPanelists: [] },
   );
 
   /* Load existing discussion if editing a draft */
@@ -41,19 +41,33 @@ export default function SetupPage() {
       getDiscussion(paramId)
         .then((res) => {
           if (res.success && res.data) {
+            const participants = res.data.participants ?? [];
             setTopic(res.data.topic);
-            if (res.data.status === "CONFIRMED" && res.data.participants.length > 0) {
+
+            if (res.data.status === "CONFIRMED" && participants.length > 0) {
+              /* Already confirmed with panel → show panel_ready */
               setPageState({
                 phase: "panel_ready",
                 discussionId: paramId,
                 topic: res.data.topic,
-                panelists: res.data.participants,
+                panelists: participants,
               });
-            } else {
+            } else if (participants.length > 0) {
+              /* DRAFT but already has panelists (e.g. re-editing) → show them */
               setPageState({
                 phase: "generate_panel",
                 discussionId: paramId,
                 topic: res.data.topic,
+                existingPanelists: participants,
+              });
+              setCount(participants.length);
+            } else {
+              /* No panelists yet → fresh generate */
+              setPageState({
+                phase: "generate_panel",
+                discussionId: paramId,
+                topic: res.data.topic,
+                existingPanelists: [],
               });
             }
           } else {
@@ -84,6 +98,7 @@ export default function SetupPage() {
           phase: "generate_panel",
           discussionId: res.data.id,
           topic: res.data.topic,
+          existingPanelists: [],
         });
       } else {
         setPageState({ phase: "error", message: res.error ?? "创建讨论失败" });
@@ -170,36 +185,75 @@ export default function SetupPage() {
 
       {/* ── Phase: generate_panel / generating ──────── */}
       {(pageState.phase === "generate_panel" || pageState.phase === "generating") && (
-        <div className={styles.form}>
-          <div className={styles.field}>
-            <span className={styles.label}>讨论话题</span>
-            <p className={styles.topicDisplay}>{pageState.topic}</p>
-          </div>
-
-          <div className={styles.field}>
-            <span className={styles.label}>嘉宾人数：{count} 人</span>
-            <div className={styles.sliderRow}>
-              <input
-                className={styles.slider}
-                type="range"
-                min={2}
-                max={6}
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-                disabled={pageState.phase === "generating"}
-              />
-              <span className={styles.sliderValue}>{count}</span>
+        <>
+          <div className={styles.form}>
+            <div className={styles.field}>
+              <span className={styles.label}>讨论话题</span>
+              <p className={styles.topicDisplay}>{(pageState as { topic: string }).topic}</p>
             </div>
-          </div>
 
-          <button
-            className={styles.generateBtn}
-            onClick={handleGenerate}
-            disabled={pageState.phase === "generating"}
-          >
-            {pageState.phase === "generating" ? "⏳ AI 生成中..." : "🤖 生成嘉宾阵容"}
-          </button>
-        </div>
+            {/* ── Show existing panelists if present ──────── */}
+            {pageState.phase === "generate_panel" &&
+              pageState.existingPanelists.length > 0 && (
+              <div className={styles.field}>
+                <span className={styles.label}>
+                  📋 已有嘉宾（{pageState.existingPanelists.length} 人）
+                </span>
+                <div className={styles.existingNotice}>
+                  ⚠️ 此讨论已存在嘉宾阵容。如需调整人数或重新生成，请使用下方滑块。
+                </div>
+                <div className={styles.existingGrid}>
+                  {pageState.existingPanelists.map((guest, i) => {
+                    const color = guest.color || EXPERT_COLORS[i % EXPERT_COLORS.length];
+                    return (
+                      <div key={guest.id} className={styles.existingCard}>
+                        <div
+                          className={styles.colorBar}
+                          style={{ backgroundColor: guest.color || color }}
+                        />
+                        <span className={styles.existingName}>
+                          {guest.name}
+                          {guest.role === "HOST" && (
+                            <span className={styles.hostBadge}>🎤 主持</span>
+                          )}
+                        </span>
+                        <span className={styles.existingTitle}>{guest.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className={styles.field}>
+              <span className={styles.label}>嘉宾人数：{count} 人</span>
+              <div className={styles.sliderRow}>
+                <input
+                  className={styles.slider}
+                  type="range"
+                  min={2}
+                  max={6}
+                  value={count}
+                  onChange={(e) => setCount(Number(e.target.value))}
+                  disabled={pageState.phase === "generating"}
+                />
+                <span className={styles.sliderValue}>{count}</span>
+              </div>
+            </div>
+
+            <button
+              className={styles.generateBtn}
+              onClick={handleGenerate}
+              disabled={pageState.phase === "generating"}
+            >
+              {pageState.phase === "generating"
+                ? "⏳ AI 生成中..."
+                : pageState.existingPanelists.length > 0
+                  ? "🤖 重新生成嘉宾阵容"
+                  : "🤖 生成嘉宾阵容"}
+            </button>
+          </div>
+        </>
       )}
 
       {/* ── Phase: panel_ready ──────── */}
