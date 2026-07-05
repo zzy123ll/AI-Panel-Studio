@@ -1,0 +1,19 @@
+{
+  "name": "ai-panel-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 多专家圆桌讨论模拟平台",
+  "scripts": {
+    "install:all": "pnpm install",
+    "dev": "concurrently -n BE,FE -c blue,green \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:backend": "cd backend && pnpm dev",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "db:setup": "cd backend && pnpm db:generate && pnpm db:migrate --name init && pnpm db:seed",
+    "db:seed": "cd backend && pnpm db:seed",
+    "test": "cd backend && pnpm test",
+    "test:e2e": "cd frontend && pnpm exec playwright test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

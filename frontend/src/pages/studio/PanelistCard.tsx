@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function PanelistCard({ panelist }: Props) {
-  const color = EXPERT_COLORS[panelist.colorIndex];
+  const color = panelist.color ?? EXPERT_COLORS[panelist.colorIndex];
 
   return (
     <div className={styles.card} data-status={panelist.status}>

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Express } from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -329,7 +330,7 @@ studioNs.on("connection", (socket) => {
         if (discussion) {
           socket.emit(WS_EVENT.HISTORY, {
             discussionId,
-            entries: discussion.transcriptEntries.map((e) => ({
+            entries: discussion.transcriptEntries.map((e: { id: string; speaker_id: string; content: string; timestamp: Date }) => ({
               id: e.id,
               speakerId: e.speaker_id,
               content: e.content,

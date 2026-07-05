@@ -1,22 +1,27 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import PanelistCard from "./studio/PanelistCard";
 import TranscriptList from "./studio/TranscriptList";
 import ConsensusBoard from "./studio/ConsensusBoard";
 import { useSocket } from "../services/useSocket";
-import type { TranscriptEvent, HistoryPayload } from "../services/useSocket";
 import { sanitizeAiText, looksLikeRawJson } from "../services/sanitize";
 import {
-  mockPanelists,
-  mockTranscript,
-  mockConsensus,
-  mockDivergence,
-} from "./studioData";
+  getDiscussion,
+  startDiscussion,
+} from "../services/api";
+import type {
+  TranscriptEvent,
+  HistoryPayload,
+  AgentStatusPayload,
+  ConsensusDivergencePayload,
+  DiscussionEndPayload,
+} from "../services/useSocket";
 import type {
   PanelistInfo,
   TranscriptLine,
   ConsensusEntry,
   DivergenceEntry,
+  IndicatorStatus,
 } from "./studioData";
 import styles from "./StudioPage.module.css";
 
@@ -29,120 +34,157 @@ interface SummaryItem {
   content: string;
 }
 
+/* ── Helpers ──────────────────────────────────────────── */
+
+function mapStatus(s: string): IndicatorStatus {
+  if (s === "speaking") return "speaking";
+  if (s === "raising_hand" || s === "listening") return "listening";
+  return "idle";
+}
+
 export default function StudioPage() {
   const { id: discussionId } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  /* ── State ────────────────────────────────────────── */
-  const [mobileTab, setMobileTab] = useState<MobileTab>("transcript");
-  const [panelists, setPanelists] = useState<PanelistInfo[]>(mockPanelists);
-  const [transcript, setTranscript] =
-    useState<TranscriptLine[]>(mockTranscript);
-  const [consensus] = useState<ConsensusEntry[]>(mockConsensus);
-  const [divergence] = useState<DivergenceEntry[]>(mockDivergence);
-  const [currentSpeaker, setCurrentSpeaker] = useState<PanelistInfo | null>(
-    mockPanelists[0],
-  );
+  /* ── Core state ────────────────────────────────────── */
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [topic, setTopic] = useState("");
+  const [panelists, setPanelists] = useState<PanelistInfo[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
+  const [liveConsensus, setLiveConsensus] = useState<ConsensusEntry[]>([]);
+  const [liveDivergence, setLiveDivergence] = useState<DivergenceEntry[]>([]);
+  const [currentSpeaker, setCurrentSpeaker] = useState<PanelistInfo | null>(null);
   const [summary, setSummary] = useState<SummaryItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("transcript");
 
-  /* ── Derive live consensus from transcript (mock for now) ── */
-  const [liveConsensus, setLiveConsensus] = useState<ConsensusEntry[]>([]);
-  const [liveDivergence, setLiveDivergence] = useState<DivergenceEntry[]>([]);
+  /* ── Load discussion data on mount ─────────────────── */
+  useEffect(() => {
+    if (!discussionId) return;
 
-  /* ── Socket ────────────────────────────────────────── */
-  const handleTranscript = useCallback((evt: TranscriptEvent) => {
-    const newLine: TranscriptLine = {
-      id: `t-${evt.timestamp}-${Math.random().toString(36).slice(2, 6)}`,
-      speakerName: evt.speakerName,
-      colorIndex: 0, // will be matched below
-      content: sanitizeAiText(evt.content),
-      timestamp: new Date(evt.timestamp).toLocaleTimeString("zh-CN"),
-    };
+    getDiscussion(discussionId)
+      .then((res) => {
+        if (!res.success || !res.data) {
+          setLoadError(res.error ?? "讨论不存在");
+          setLoading(false);
+          return;
+        }
 
-    setTranscript((prev) => [...prev, newLine]);
+        const d = res.data;
+        setTopic(d.topic);
 
-    // Update panelist statuses
-    setPanelists((prev) =>
-      prev.map((p) => ({
-        ...p,
-        status:
-          p.id === evt.speakerId
-            ? "speaking"
-            : p.status === "speaking"
-              ? "listening"
-              : p.status,
-      })),
-    );
+        /* Map participants to panelist cards */
+        if (d.participants.length > 0) {
+          const mapped: PanelistInfo[] = d.participants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            title: p.title,
+            stance: p.stance,
+            colorIndex: 0,
+            color: p.color,
+            status: "idle" as IndicatorStatus,
+            thinkingBubble: "",
+          }));
+          setPanelists(mapped);
+        }
 
-    // Update current speaker
-    setPanelists((prev) => {
-      const speaker = prev.find((p) => p.id === evt.speakerId);
-      if (speaker) {
-        setCurrentSpeaker({
-          ...speaker,
-          status: "speaking",
-          thinkingBubble: evt.content,
-        });
-      }
-      return prev;
-    });
+        /* Map existing transcript */
+        if (d.transcriptEntries && d.transcriptEntries.length > 0) {
+          const lines: TranscriptLine[] = d.transcriptEntries.map((e) => ({
+            id: e.id,
+            speakerName:
+              d.participants.find((p) => p.id === e.speaker_id)?.name ?? "未知",
+            colorIndex: 0,
+            content: sanitizeAiText(e.content),
+            timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
+          }));
+          setTranscript(lines);
+        }
 
-    // Auto-generate consensus/divergence entries based on transcript length
-    if (transcript.length > 0 && transcript.length % 3 === 0) {
-      setLiveConsensus((prev) => [
-        ...prev,
-        {
-          id: `lc-${Date.now()}`,
-          content: sanitizeAiText(
-            `阶段性共识：嘉宾就 "${evt.content.slice(0, 20)}..." 展开讨论，观点趋于明朗`,
-          ),
-        },
-      ]);
-    }
-    if (transcript.length > 0 && transcript.length % 5 === 0) {
-      setLiveDivergence((prev) => [
-        ...prev,
-        {
-          id: `ld-${Date.now()}`,
-          content: sanitizeAiText(
-            `分歧点：关于 "${evt.content.slice(0, 15)}..." 各方立场尚未统一`,
-          ),
-        },
-      ]);
-    }
-  }, [transcript.length]);
+        /* If already ONGOING, mark as running */
+        if (d.status === "ONGOING") {
+          setIsRunning(true);
+        }
+        if (d.status === "ENDED") {
+          setEnded(true);
+        }
 
-  const handleHistory = useCallback((payload: HistoryPayload) => {
-    if (payload.entries.length > 0) {
-      const lines: TranscriptLine[] = payload.entries.map((e) => ({
-        id: e.id,
-        speakerName: "", // Will be resolved from participant list
+        setLoading(false);
+      })
+      .catch((err) => {
+        setLoadError((err as Error).message ?? "加载讨论失败，请确认后端已启动");
+        setLoading(false);
+      });
+  }, [discussionId]);
+
+  /* ── Socket event handlers ─────────────────────────── */
+
+  const handleTranscript = useCallback(
+    (evt: TranscriptEvent) => {
+      const newLine: TranscriptLine = {
+        id: `t-${evt.timestamp}-${Math.random().toString(36).slice(2, 6)}`,
+        speakerName: evt.speakerName,
         colorIndex: 0,
-        content: sanitizeAiText(e.content),
-        timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
-      }));
-      // Replace mock transcript with real history
-      setTranscript(lines);
-    }
-  }, []);
+        content: sanitizeAiText(evt.content),
+        timestamp: new Date(evt.timestamp).toLocaleTimeString("zh-CN"),
+      };
+
+      setTranscript((prev) => [...prev, newLine]);
+
+      /* Update panelist statuses */
+      setPanelists((prev) =>
+        prev.map((p) => ({
+          ...p,
+          status:
+            p.id === evt.speakerId
+              ? "speaking"
+              : p.status === "speaking"
+                ? "listening"
+                : p.status,
+        })),
+      );
+
+      /* Update current speaker */
+      setPanelists((prev) => {
+        const speaker = prev.find((p) => p.id === evt.speakerId);
+        if (speaker) {
+          setCurrentSpeaker({
+            ...speaker,
+            status: "speaking",
+            thinkingBubble: evt.content,
+          });
+        }
+        return prev;
+      });
+    },
+    [],
+  );
+
+  const handleHistory = useCallback(
+    (payload: HistoryPayload) => {
+      if (payload.entries.length > 0 && transcript.length === 0) {
+        const lines: TranscriptLine[] = payload.entries.map((e) => ({
+          id: e.id,
+          speakerName: "",
+          colorIndex: 0,
+          content: sanitizeAiText(e.content),
+          timestamp: new Date(e.timestamp).toLocaleTimeString("zh-CN"),
+        }));
+        setTranscript(lines);
+      }
+    },
+    [transcript.length],
+  );
 
   const handleAgentStatus = useCallback(
-    (payload: import("../services/useSocket").AgentStatusPayload) => {
+    (payload: AgentStatusPayload) => {
       setPanelists((prev) =>
         prev.map((p) => {
           const agent = payload.agents.find((a) => a.expertId === p.id);
           if (!agent) return p;
-          return {
-            ...p,
-            status:
-              agent.state === "speaking"
-                ? "speaking"
-                : agent.state === "raising_hand"
-                  ? "listening"
-                  : "idle",
-          };
+          return { ...p, status: mapStatus(agent.state) };
         }),
       );
     },
@@ -150,7 +192,7 @@ export default function StudioPage() {
   );
 
   const handleConsensusNew = useCallback(
-    (payload: import("../services/useSocket").ConsensusDivergencePayload) => {
+    (payload: ConsensusDivergencePayload) => {
       setLiveConsensus((prev) => [
         ...prev,
         ...payload.items.map((item) => ({
@@ -163,7 +205,7 @@ export default function StudioPage() {
   );
 
   const handleDivergenceNew = useCallback(
-    (payload: import("../services/useSocket").ConsensusDivergencePayload) => {
+    (payload: ConsensusDivergencePayload) => {
       setLiveDivergence((prev) => [
         ...prev,
         ...payload.items.map((item) => ({
@@ -176,7 +218,7 @@ export default function StudioPage() {
   );
 
   const handleDiscussionEnd = useCallback(
-    (payload: import("../services/useSocket").DiscussionEndPayload) => {
+    (payload: DiscussionEndPayload) => {
       setEnded(true);
       setIsRunning(false);
       setCurrentSpeaker(null);
@@ -204,38 +246,69 @@ export default function StudioPage() {
   });
 
   /* ── Actions ───────────────────────────────────────── */
-  const handleStart = () => {
-    // Optimistic UI — show end button immediately, even without backend
-    setIsRunning(true);
-    // Still try to confirm with backend (fires socket event if connected)
-    confirm();
-  };
 
-  const handleEnd = () => {
+  const handleStart = useCallback(async () => {
+    if (!discussionId) return;
+
+    try {
+      /* 1. Call API to create scheduler */
+      const res = await startDiscussion(discussionId);
+      if (!res.success) {
+        console.error("启动讨论失败:", res.error);
+        return;
+      }
+      /* 2. Confirm scheduler start via WebSocket */
+      setIsRunning(true);
+      confirm();
+    } catch (err) {
+      console.error("启动讨论失败:", (err as Error).message);
+    }
+  }, [discussionId, confirm]);
+
+  const handleEnd = useCallback(() => {
     stopSession();
     setIsRunning(false);
     setEnded(true);
 
-    // Generate sanitized summary (in production this comes from AI extractConsensus)
     const summaryText = sanitizeAiText(
       `本次讨论围绕核心话题展开，共产生 ${transcript.length} 条发言。嘉宾们从不同角度进行了深入探讨，在关键技术路径上既有共识也存在分歧。主持人引导讨论聚焦于可落地的解决方案，为后续行动提供了建设性框架。`,
     );
 
-    // Verify no raw JSON leaks into summary
     if (looksLikeRawJson(summaryText)) {
       console.error("[BUG] Summary contains raw JSON artefacts!");
     }
 
     setSummary([{ id: "summary-1", content: summaryText }]);
     setCurrentSpeaker(null);
-  };
+  }, [stopSession, transcript.length]);
+
+  /* ── Loading / Error states ────────────────────────── */
+
+  if (loading) {
+    return (
+      <div className={styles.loadingContainer}>
+        <p className={styles.loadingText}>⏳ 加载讨论数据...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={styles.loadingContainer}>
+        <p className={styles.loadingError}>⚠️ {loadError}</p>
+        <button className={styles.loadingRetry} onClick={() => navigate("/dashboard")}>
+          ← 返回面板
+        </button>
+      </div>
+    );
+  }
 
   /* ── Render ────────────────────────────────────────── */
   return (
     <div className={styles.layout}>
-      {/* ════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════
           Left Column — Main Stage + Panelist Grid
-          ════════════════════════════════════════════════ */}
+          ════════════════════════════════════════════════════ */}
       <div className={styles.left}>
         {/* ── Summary (post-end) ──────── */}
         {ended && summary.length > 0 && (
@@ -263,33 +336,48 @@ export default function StudioPage() {
           ) : (
             <>
               <span className={styles.stageLabel}>
-                {ended ? "🏁 讨论已结束" : "⏳ 等待开始"}
+                {ended ? "🏁 讨论已结束" : isRunning ? "⏳ 等待发言..." : "⏳ 等待开始"}
               </span>
               <h2 className={styles.stageSpeaker}>
-                {ended ? "讨论结束" : "点击下方按钮启动讨论"}
+                {ended
+                  ? "讨论结束"
+                  : isRunning
+                    ? "嘉宾思考中..."
+                    : topic || "点击下方按钮启动讨论"}
               </h2>
               <p className={styles.stageStance}>
                 {ended
                   ? `共产生 ${transcript.length} 条发言`
-                  : "嘉宾就位，等待主持人确认"}
+                  : isRunning
+                    ? `正在讨论：${topic}`
+                    : "嘉宾就位，等待主持人确认"}
               </p>
             </>
           )}
         </div>
 
         {/* ── Panelist Grid ──────────── */}
-        <span className={styles.panelLabel}>专家席位</span>
-        <div className={`${styles.panelGrid} scroll-container`}>
-          {panelists.map((p) => (
-            <PanelistCard key={p.id} panelist={p} />
-          ))}
-        </div>
+        {panelists.length > 0 && (
+          <>
+            <span className={styles.panelLabel}>专家席位</span>
+            <div className={`${styles.panelGrid} scroll-container`}>
+              {panelists.map((p) => (
+                <PanelistCard key={p.id} panelist={p} />
+              ))}
+            </div>
+          </>
+        )}
 
         {/* ── Controls ───────────────── */}
         <div className={styles.controls}>
-          {!isRunning && !ended && (
+          {!isRunning && !ended && panelists.length > 0 && (
             <button className={styles.startBtn} onClick={handleStart}>
               ▶ 启动讨论
+            </button>
+          )}
+          {!isRunning && !ended && panelists.length === 0 && (
+            <button className={styles.backBtn} onClick={() => navigate(`/setup/${discussionId}`)}>
+              ← 返回配置嘉宾
             </button>
           )}
           {isRunning && (
@@ -308,9 +396,9 @@ export default function StudioPage() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════
           Right Column — Desktop
-          ════════════════════════════════════════════════ */}
+          ════════════════════════════════════════════════════ */}
       <aside className={styles.right}>
         <div className={styles.transcriptSection}>
           <div className={styles.sectionHeader}>
@@ -325,31 +413,23 @@ export default function StudioPage() {
           <div className={styles.sectionHeader}>📊 共识 / 分歧</div>
           <div className={styles.sectionBody} data-testid="consensus-area">
             <ConsensusBoard
-              consensus={
-                liveConsensus.length > 0 ? liveConsensus : consensus
-              }
-              divergence={
-                liveDivergence.length > 0 ? liveDivergence : divergence
-              }
+              consensus={liveConsensus}
+              divergence={liveDivergence}
             />
           </div>
         </div>
       </aside>
 
-      {/* ════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════
           Mobile Panel
-          ════════════════════════════════════════════════ */}
+          ════════════════════════════════════════════════════ */}
       <div className={styles.mobilePanel}>
         {mobileTab === "transcript" ? (
           <TranscriptList lines={transcript} />
         ) : (
           <ConsensusBoard
-            consensus={
-              liveConsensus.length > 0 ? liveConsensus : consensus
-            }
-            divergence={
-              liveDivergence.length > 0 ? liveDivergence : divergence
-            }
+            consensus={liveConsensus}
+            divergence={liveDivergence}
           />
         )}
       </div>

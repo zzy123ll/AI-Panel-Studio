@@ -78,11 +78,11 @@ pnpm install
 
 ### 3. 配置环境变量
 
-在 `backend/` 目录下创建 `.env` 文件：
+复制环境变量模板并填入你的 DeepSeek API Key：
 
 ```bash
-# backend/.env
-DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入真实的 API Key
 ```
 
 > 获取 API Key：[Deepseek 开放平台](https://platform.deepseek.com/)
@@ -90,29 +90,35 @@ DEEPSEEK_API_KEY=sk-your-deepseek-api-key
 ### 4. 初始化数据库
 
 ```bash
-cd backend
-pnpm exec prisma generate
-pnpm exec prisma migrate dev --name init
-pnpm exec tsx prisma/seed.ts
+# 在项目根目录执行（使用 pnpm workspace 脚本）
+pnpm db:setup
 ```
 
-### 5. 启动后端
-
+或手动分步执行：
 ```bash
 cd backend
-pnpm exec tsx src/server.ts
+pnpm db:generate      # 生成 Prisma Client
+pnpm db:migrate --name init  # 创建数据库表
+pnpm db:seed          # 植入种子数据（5 个话题 + 嘉宾阵容）
 ```
 
-服务运行在 `http://localhost:3001`
-
-### 6. 启动前端
+### 5. 一键启动前后端
 
 ```bash
-cd frontend
+# 在项目根目录执行（同时启动后端 :3001 和前端 :5173）
 pnpm dev
 ```
 
-前端运行在 `http://localhost:5173`
+或分别启动：
+```bash
+# 终端 1 — 启动后端
+pnpm dev:backend     # → http://localhost:3001
+
+# 终端 2 — 启动前端
+pnpm dev:frontend    # → http://localhost:5173
+```
+
+> **注意**：启动后端需要先完成步骤 3（配置 `.env`），否则 AI 生成阵容等功能不可用。
 
 ---
 

@@ -10,6 +10,7 @@ export interface PanelistInfo {
   title: string;
   stance: string;
   colorIndex: number;
+  color?: string;
   status: IndicatorStatus;
   thinkingBubble: string;
 }

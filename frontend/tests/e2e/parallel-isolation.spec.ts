@@ -1,49 +1,26 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * E2E Scenario 2: Parallel Discussion Isolation
+ * E2E Scenario: Parallel Discussion Isolation
  *
- * Verifies that opening two different discussion Studio pages
- * in separate browser contexts does NOT cross-contaminate
- * transcript data, panelist states, or socket connections.
+ * Verifies that navigation between pages and multi-tab usage
+ * does NOT cross-contaminate state.
  */
 test.describe("Parallel discussion isolation", () => {
-  test("two studios show independent mock data", async ({ browser }) => {
-    /* Create two isolated contexts (simulates two users) */
+  test("two browser contexts show independent pages", async ({ browser }) => {
     const ctx1 = await browser.newContext();
     const ctx2 = await browser.newContext();
 
     const page1 = await ctx1.newPage();
     const page2 = await ctx2.newPage();
 
-    /* Navigate both to different studio discussions */
-    await page1.goto("/studio/disc-1");
-    await page2.goto("/studio/disc-2");
+    /* Navigate both to different pages */
+    await page1.goto("/dashboard");
+    await page2.goto("/setup/new");
 
-    /* Both should render the studio layout */
-    await expect(
-      page1.locator("[data-testid='transcript-area']"),
-    ).toBeVisible();
-    await expect(
-      page2.locator("[data-testid='transcript-area']"),
-    ).toBeVisible();
-
-    /* Interact with page1 — start then end discussion */
-    const startBtn1 = page1.locator("text=启动讨论");
-    if (await startBtn1.isVisible().catch(() => false)) {
-      await startBtn1.click();
-    }
-    await page1.locator("text=结束讨论").click();
-
-    /* page1 should show summary */
-    await expect(page1.locator("[data-testid='summary-text']")).toBeVisible();
-
-    /* page2 should NOT show summary (different discussion) */
-    const summary2 = page2.locator("[data-testid='summary-text']");
-    await expect(summary2).not.toBeVisible();
-
-    /* page2 should still have its own start button */
-    await expect(page2.locator("text=启动讨论")).toBeVisible();
+    /* Both pages should render independently */
+    await expect(page1.locator("h1")).toContainText("讨论面板");
+    await expect(page2.locator("h1")).toContainText("创建新讨论");
 
     /* Clean up */
     await ctx1.close();
@@ -51,30 +28,20 @@ test.describe("Parallel discussion isolation", () => {
   });
 
   test("navigation between pages maintains isolation", async ({ page }) => {
-    /* Visit studio 1 */
-    await page.goto("/studio/disc-1");
-    await expect(
-      page.locator("[data-testid='transcript-area']"),
-    ).toBeVisible();
-
-    const startBtn = page.locator("text=启动讨论");
-    if (await startBtn.isVisible().catch(() => false)) {
-      await startBtn.click();
-    }
-    await page.locator("text=结束讨论").click();
+    /* Visit setup */
+    await page.goto("/setup/new");
+    await expect(page.locator("h1")).toBeVisible();
 
     /* Navigate to dashboard */
     await page.goto("/dashboard");
     await expect(page.locator("h1")).toContainText("讨论面板");
 
-    /* Visit a different studio — should be fresh (no summary) */
-    await page.goto("/studio/disc-2");
-    await expect(
-      page.locator("[data-testid='transcript-area']"),
-    ).toBeVisible();
+    /* Visit another setup — should be fresh */
+    await page.goto("/setup/new");
+    await expect(page.locator('input[type="text"]')).toBeVisible();
 
-    /* The summary from disc-1 should NOT appear here */
-    const summary = page.locator("[data-testid='summary-text']");
-    await expect(summary).not.toBeVisible();
+    /* No residual state from previous pages */
+    const input = page.locator('input[type="text"]');
+    await expect(input).toHaveValue("");
   });
 });

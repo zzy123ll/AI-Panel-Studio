@@ -1,4 +1,43 @@
 /* ═══════════════════════════════════════════════════════
+   Loading / Error
+   ═══════════════════════════════════════════════════════ */
+
+.loadingContainer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.loadingText {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.loadingError {
+  font-size: 16px;
+  color: #ef5350;
+}
+
+.loadingRetry {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.loadingRetry:hover {
+  background: var(--border-color);
+}
+
+/* ═══════════════════════════════════════════════════════
    Studio Layout — CSS Grid (1fr + 400px)
    ═══════════════════════════════════════════════════════ */
 

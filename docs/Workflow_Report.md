@@ -68,7 +68,54 @@
 
 **教训**：Prompt 工程的核心不是"让 AI 说得对"，而是"让 AI 说得对且说得短"。口语化约束和篇幅限制是圆桌模拟中最重要的 Prompt 设计维度。
 
-## 三、对"工程化 AI 开发"的理解
+### 问题 4：Mock 数据页面从未接入真实 API，导致"启动后无讨论流动过程"
+
+**现象**：项目启动后，Dashboard 显示硬编码的 5 条假数据，Setup 页面只能预览 Mock 嘉宾，Studio 页面初始化时使用 Mock 数据——整个前端是"静态展示层"，没有任何与后端的数据交互。用户点击"启动讨论"后没有实时发言流动。
+
+**根因**：开发流程中，DDD 阶段（Design-Driven Development）用 Mock 数据快速出 UI 壳，但在后续 TDD 和 E2E 阶段，只把 Socket.io 集成"叠加"到了 Mock 数据之上，从未将页面核心数据源从 Mock 切换到 API。这是典型的"API 集成滞后"问题——UI 和接口分别开发，但集成步骤被遗漏。
+
+**解决路径**：
+1. DashboardPage：`useState(mockDiscussions)` → `useEffect` + `listDiscussions()` API 调用，添加 loading/error/empty 三种状态处理。
+2. SetupPage：从纯展示组件重构为状态机驱动的多阶段流程（`input_topic → creating → generate_panel → generating → panel_ready`），集成 `createDiscussion()` 和 `generatePanel()` API 调用。
+3. StudioPage：从 Mock 数据初始化 → `getDiscussion()` API 加载真实 discussion + participants + transcriptEntries，Socket 事件在此基础上做增量更新。
+4. PanelistCard：扩展 `PanelistInfo` 类型增加 `color?: string`，支持来自 API 的 hex 色值。
+
+**教训**：Mock 数据是双刃剑——它让 UI 开发不被后端阻塞，但必须在 API Ready 后第一时间切换到真实数据源。应在 DDD 阶段的 Mock 组件中预留 `useEffect` + API 调用的注释占位符，作为后续集成的"契约标记"。
+
+### 问题 5：根目录缺少 package.json 和 workspace 配置，项目无法一键启动
+
+**现象**：README 写 "pnpm install → pnpm dev" 但根目录没有 `package.json` 也没有 `pnpm-workspace.yaml`。用户不得不分别 cd 到 backend/ 和 frontend/ 手动执行命令。后端没有 `dev` script，只能手动输入 `pnpm exec tsx src/server.ts`。
+
+**根因**：项目初期用 `pnpm init` 分别在 backend/ 和 frontend/ 下初始化，但从未在根目录建立 monorepo 的"入口"。AI 在生成 README 时假设了 monorepo 的标准结构，但该结构并未实际创建。
+
+**解决路径**：
+1. 创建根 `package.json`，使用 `concurrently` 编排前后端并行启动。
+2. 创建 `pnpm-workspace.yaml` 声明 workspace 包。
+3. 后端 `package.json` 添加 `dev: "tsx src/server.ts"` script。
+4. 添加 `db:setup` 一键初始化数据库的便捷脚本。
+5. 同步更新 README 的启动指令。
+
+**教训**：monorepo 的"入口体验"必须在项目 scaffold 阶段就验证——`git clone → pnpm install → pnpm dev` 是否能一次性跑通。不能假设用户会分别进入子目录手动操作。
+
+### 问题 6：server.ts 未加载 dotenv，环境变量静默失效
+
+**现象**：用户配置了 `.env` 中的 `DEEPSEEK_API_KEY`，但 AI 功能（生成嘉宾阵容、调度发言）始终失败。日志没有明确报错，只是 AI API 调用返回空或超时。
+
+**根因**：`server.ts` 读取 `process.env.DEEPSEEK_API_KEY` 和 `process.env.PORT`，但文件顶部缺少 `import "dotenv/config"`。Node.js 不会自动加载 `.env` 文件，导致所有环境变量为 `undefined`。
+
+**解决路径**：在 `server.ts` 的第一行（所有其他 import 之前）添加 `import "dotenv/config"`。同时创建 `.env.example` 模板文件降低配置门槛。
+
+**教训**：环境变量加载是"基础设施中的基础设施"。应在项目创建时就写一个启动前的"自检脚本"——检查必需的环境变量是否存在、数据库是否可达——而不是等用户在运行时发现 AI 莫名其妙不工作。
+
+### 问题 7：pnpm 11 的 build scripts 审批机制阻断依赖安装
+
+**现象**：`pnpm install` 后，Prisma Client 无法生成、sqlite3 原生模块未编译。原因是 pnpm 11 引入了 `allowBuilds` 机制——默认拒绝所有需要执行构建脚本的依赖（prisma、esbuild、sqlite3 等），需要显式审批。
+
+**根因**：pnpm 11 的安全策略变更，AI 的知识截止日期未覆盖此破坏性变更。项目在 CI/新环境执行 `pnpm install` 后，关键依赖实际未完成安装。
+
+**解决路径**：在 `pnpm-workspace.yaml` 中添加 `allowBuilds` 配置，将 `@prisma/engines`、`esbuild`、`prisma`、`sqlite3`、`unrs-resolver` 设为 `true`。
+
+**教训**：包管理器的安全策略是"静默的破坏者"——安装看起来成功，但功能不工作。应在项目 README 中明确写出所需的 `pnpm approve-builds` 步骤，或直接在 `pnpm-workspace.yaml` 中预配置 `allowBuilds`。
 
 工程化 AI 开发不是"用 Prompt 生成代码"，而是**将 AI 当作一个高性能但需要精确指令的初级工程师**，通过以下机制确保交付质量：
 
