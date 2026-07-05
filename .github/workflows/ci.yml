@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ═══════════════════════════════════════════════════════
+  # Job 1: TypeScript check + unit tests
+  # ═══════════════════════════════════════════════════════
+  test:
+    name: TypeScript + Jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: cd backend && pnpm db:generate
+
+      - name: TypeScript check (backend)
+        run: cd backend && pnpm exec tsc --noEmit
+
+      - name: TypeScript check (frontend)
+        run: cd frontend && pnpm exec tsc --noEmit
+
+      - name: Jest unit tests
+        run: cd backend && pnpm test
+
+  # ═══════════════════════════════════════════════════════
+  # Job 2: E2E tests (Playwright)
+  # ═══════════════════════════════════════════════════════
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: cd frontend && pnpm exec playwright install --with-deps chromium
+
+      - name: Start dev server
+        run: cd frontend && pnpm dev &
+          sleep 3
+
+      - name: Run E2E tests
+        run: cd frontend && pnpm exec playwright test
+        env:
+          CI: true
+
+      - name: Upload test results (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results/
+
+  # ═══════════════════════════════════════════════════════
+  # Job 3: Security review
+  # ═══════════════════════════════════════════════════════
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for exposed secrets
+        run: |
+          # Ensure no .env files committed
+          if git ls-files | grep -q '\.env$'; then
+            echo "ERROR: .env file is tracked by git!"
+            exit 1
+          fi
+          echo "No .env files tracked"
+
+          # Check no API keys in source
+          if grep -rq 'sk-[a-zA-Z0-9]\{20,\}' --include='*.ts' --include='*.tsx' --include='*.js' . 2>/dev/null; then
+            echo "ERROR: Possible API key pattern found in source!"
+            exit 1
+          fi
+          echo "No API key patterns found in source"
