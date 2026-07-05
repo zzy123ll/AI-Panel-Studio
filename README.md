@@ -259,5 +259,46 @@ idle ──→ preparing ──→ speaking ──→ idle
 
 - ✅ `sanitizeAiText()` — 防止 AI 返回的 JSON 原始大括号泄漏到 UI
 - ✅ `PanelistCard.statusLight` — 专家状态灯通过 `@keyframes` 实时脉冲闪烁
-- ✅ `useSocket` — 页面导航时自动清理 Socket 监听器 (useEffect cleanup)
-- ✅ `StudioPage.handleEnd` — 结束讨论后 `looksLikeRawJson()` 检查总结无 JSON 污染
+- ✅ `useSocket` — 页面导航时自动清理 Socket 监听器 + 房间 leave (useEffect cleanup)
+
+---
+
+## 已完成能力
+
+| 能力 | 说明 |
+|------|------|
+| 讨论生命周期管理 | DRAFT → CONFIRMED → ONGOING → ENDED 完整状态机，含严格的状态转换校验 |
+| AI 嘉宾阵容生成 | 输入话题后，AI 自动生成主持人 + 专家阵容（姓名、头衔、立场、颜色） |
+| 多专家自主发言决策 | 每 4 秒一轮调度 — 随机选取 1-2 名专家，AI 独立决定 SPEAK/interject/rebut/WAIT |
+| 冲突仲裁 | 主持人优先 → 立场对立度排序 → 平局取首位候选，Fisher-Yates 洗牌保证随机性 |
+| 实时转录 | WebSocket 推送每条发言到前端，支持历史回放（加入房间时自动加载） |
+| 共识/分歧提取 | 每 5 轮 AI 提炼共识点和分歧点，讨论结束时生成最终总结 |
+| 专家状态可视化 | 状态灯脉冲动画（idle/listening/speaking），思考气泡实时更新 |
+| 多讨论并行隔离 | 每个讨论独立 Scheduler 实例 + 独立 Socket.io 房间 + 独立前端 Context |
+| JSON 防泄漏 | `sanitizeAiText()` 递归剥离 AI 输出的 JSON 大括号，`looksLikeRawJson()` 二次校验 |
+| 响应式布局 | CSS Grid 1fr+400px（桌面）/ 单列（< 1024px），Tab 切换转录/共识面板（移动端） |
+| AI API 容错 | 3 次指数退避重试（1s/2s/4s），30s AbortController 超时，heuristic 回退 |
+| 完整测试覆盖 | Jest 28 单元测试（AI Client + Scheduler）+ Playwright 17 E2E 测试（完整用户流程 + 并行隔离） |
+
+## 后续改进方向
+
+### 短期（MVP+）
+- [ ] **用户认证**：添加登录/注册，支持个人讨论历史
+- [ ] **讨论模板**：预置常见话题模板（科技、经济、社会），一键创建
+- [ ] **消息持久化恢复**：页面刷新后 WebSocket 重连并恢复 Transcript 和状态
+- [ ] **嘉宾自定义**：允许用户手动编辑 AI 生成的嘉宾阵容
+- [ ] **移动端优化**：PWA 支持，离线缓存
+
+### 中期（产品化）
+- [ ] **多种 AI 模型接入**：支持 OpenAI、Claude、通义千问等多模型切换 / 混合使用
+- [ ] **讨论回放**：讨论结束后可回放完整过程（时间轴 + 播放控制）
+- [ ] **数据导出**：支持 PDF/Word 格式导出讨论报告
+- [ ] **讨论对比**：同一话题多次讨论的共识分歧对比分析
+- [ ] **i18n 多语言**：界面 + 讨论内容国际化
+
+### 长期（平台化）
+- [ ] **自定义 Prompt 模板**：用户可编辑专家角色 Prompt 和主持人规则
+- [ ] **讨论质量评分**：AI 自动评估讨论深度、逻辑连贯性、观点多样性
+- [ ] **知识图谱构建**：从多场讨论中自动构建观点关联网络
+- [ ] **API 开放平台**：提供 RESTful + WebSocket API 供第三方集成
+- [ ] **多人协作**：支持多用户同时观看 + 弹幕互动
