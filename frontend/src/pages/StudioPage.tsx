@@ -128,11 +128,79 @@ export default function StudioPage() {
     }
   }, []);
 
+  const handleAgentStatus = useCallback(
+    (payload: import("../services/useSocket").AgentStatusPayload) => {
+      setPanelists((prev) =>
+        prev.map((p) => {
+          const agent = payload.agents.find((a) => a.expertId === p.id);
+          if (!agent) return p;
+          return {
+            ...p,
+            status:
+              agent.state === "speaking"
+                ? "speaking"
+                : agent.state === "raising_hand"
+                  ? "listening"
+                  : "idle",
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const handleConsensusNew = useCallback(
+    (payload: import("../services/useSocket").ConsensusDivergencePayload) => {
+      setLiveConsensus((prev) => [
+        ...prev,
+        ...payload.items.map((item) => ({
+          id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          content: sanitizeAiText(item),
+        })),
+      ]);
+    },
+    [],
+  );
+
+  const handleDivergenceNew = useCallback(
+    (payload: import("../services/useSocket").ConsensusDivergencePayload) => {
+      setLiveDivergence((prev) => [
+        ...prev,
+        ...payload.items.map((item) => ({
+          id: `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          content: sanitizeAiText(item),
+        })),
+      ]);
+    },
+    [],
+  );
+
+  const handleDiscussionEnd = useCallback(
+    (payload: import("../services/useSocket").DiscussionEndPayload) => {
+      setEnded(true);
+      setIsRunning(false);
+      setCurrentSpeaker(null);
+      setSummary([
+        {
+          id: "summary-1",
+          content: sanitizeAiText(
+            `讨论已结束。共产生 ${payload.transcriptCount} 条发言，话题：${payload.topic}`,
+          ),
+        },
+      ]);
+    },
+    [],
+  );
+
   const { confirm, stopSession } = useSocket({
     discussionId: discussionId ?? null,
     onTranscript: handleTranscript,
     onHistory: handleHistory,
     onConfirmed: () => setIsRunning(true),
+    onAgentStatusChange: handleAgentStatus,
+    onConsensusNew: handleConsensusNew,
+    onDivergenceNew: handleDivergenceNew,
+    onDiscussionEnd: handleDiscussionEnd,
   });
 
   /* ── Actions ───────────────────────────────────────── */

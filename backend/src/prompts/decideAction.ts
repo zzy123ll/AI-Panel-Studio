@@ -16,10 +16,10 @@ export function buildDecideActionPrompt(
 Recent transcript:
 ${history}
 
-Decide what the moderator should do next. Return a JSON object:
+Decide what action this expert should take. Return a JSON object:
 {
-  "intent": "SPEAK" | "ASK" | "SUMMARIZE" | "END",
-  "content": "the exact text to say or ask"
+  "intent": "SPEAK" | "interject" | "rebut" | "WAIT",
+  "content": "1-2 sentences in spoken Chinese, natural interruption or rebuttal. Keep it short — no long monologues."
 }`,
   };
 }

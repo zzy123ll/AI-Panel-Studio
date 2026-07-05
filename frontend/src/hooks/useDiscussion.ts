@@ -9,7 +9,7 @@ import {
   useDiscussionState,
   useDiscussionDispatch,
 } from "../stores/discussionStore.js";
-import { useSocket } from "../services/useSocket";
+import { useSocket } from "../services/useSocket.js";
 import { sanitizeAiText } from "../services/sanitize";
 import type {
   TranscriptEvent,
@@ -17,7 +17,7 @@ import type {
   AgentStatusPayload,
   ConsensusDivergencePayload,
   DiscussionEndPayload,
-} from "../services/useSocket";
+} from "../services/useSocket.js";
 import type { TranscriptLine } from "../stores/discussionStore.js";
 
 export function useDiscussion(discussionId: string | undefined) {

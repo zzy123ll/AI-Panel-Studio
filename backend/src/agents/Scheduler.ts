@@ -112,6 +112,7 @@ export class Scheduler extends EventEmitter {
   }
 
   stop(): void {
+    if (!this.running) return; // idempotent guard
     this.running = false;
     if (this.timer !== null) {
       clearInterval(this.timer);
@@ -216,19 +217,24 @@ export class Scheduler extends EventEmitter {
     /* Update last-speaker tracking */
     this.lastSpeakerId = winner.agent.expertId;
 
-    /* Reset all agents to idle, clear consecutive counts for non-winners */
+    /* Reset non-winner agents: clear consecutive counts + return to idle */
     for (const agent of this.agents.values()) {
       if (agent.expertId !== winner.agent.expertId) {
         agent.resetConsecutiveCount();
+        agent.idle();
       }
     }
+    /* Losers among the selected speakers explicitly go idle */
     for (const s of speakers) {
-      s.agent.idle();
+      if (s.agent.expertId !== winner.agent.expertId) {
+        s.agent.idle();
+      }
     }
-    for (const agent of candidates) {
-      if (agent.state !== "idle") agent.idle();
-    }
+    /* Broadcast status — winner stays 'speaking', others are idle */
     this.broadcastAgentStatus([...this.agents.values()]);
+
+    /* After broadcast, return winner to idle for the next tick */
+    winner.agent.idle();
 
     /* Periodic consensus extraction (every N entries) */
     if (
