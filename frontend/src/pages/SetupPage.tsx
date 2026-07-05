@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   createDiscussion,
   getDiscussion,
+  confirmDiscussion,
   generatePanel,
+  removeParticipant,
   type ParticipantResponse,
 } from "../services/api.js";
 import styles from "./SetupPage.module.css";
@@ -17,8 +19,9 @@ const EXPERT_COLORS = [
 type PageState =
   | { phase: "input_topic" }
   | { phase: "creating" }
-  | { phase: "generate_panel"; discussionId: string; topic: string; existingPanelists: ParticipantResponse[] }
+  | { phase: "generate_panel"; discussionId: string; topic: string; existingPanelists: ParticipantResponse[]; status: string }
   | { phase: "generating"; discussionId: string; topic: string }
+  | { phase: "confirming"; discussionId: string; topic: string; panelists: ParticipantResponse[] }
   | { phase: "panel_ready"; discussionId: string; topic: string; panelists: ParticipantResponse[] }
   | { phase: "error"; message: string };
 
@@ -29,10 +32,11 @@ export default function SetupPage() {
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(4);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [pageState, setPageState] = useState<PageState>(
     isNew
       ? { phase: "input_topic" }
-      : { phase: "generate_panel", discussionId: paramId!, topic: "", existingPanelists: [] },
+      : { phase: "generate_panel", discussionId: paramId!, topic: "", existingPanelists: [], status: "DRAFT" },
   );
 
   /* Load existing discussion if editing a draft */
@@ -45,30 +49,23 @@ export default function SetupPage() {
             setTopic(res.data.topic);
 
             if (res.data.status === "CONFIRMED" && participants.length > 0) {
-              /* Already confirmed with panel → show panel_ready */
               setPageState({
                 phase: "panel_ready",
                 discussionId: paramId,
                 topic: res.data.topic,
                 panelists: participants,
               });
-            } else if (participants.length > 0) {
-              /* DRAFT but already has panelists (e.g. re-editing) → show them */
+            } else {
               setPageState({
                 phase: "generate_panel",
                 discussionId: paramId,
                 topic: res.data.topic,
                 existingPanelists: participants,
+                status: res.data.status,
               });
-              setCount(participants.length);
-            } else {
-              /* No panelists yet → fresh generate */
-              setPageState({
-                phase: "generate_panel",
-                discussionId: paramId,
-                topic: res.data.topic,
-                existingPanelists: [],
-              });
+              if (participants.length > 0) {
+                setCount(participants.length);
+              }
             }
           } else {
             setPageState({ phase: "error", message: res.error ?? "讨论不存在" });
@@ -99,6 +96,7 @@ export default function SetupPage() {
           discussionId: res.data.id,
           topic: res.data.topic,
           existingPanelists: [],
+          status: "DRAFT",
         });
       } else {
         setPageState({ phase: "error", message: res.error ?? "创建讨论失败" });
@@ -120,16 +118,21 @@ export default function SetupPage() {
     try {
       const res = await generatePanel(discussionId, count);
       if (res.success && res.data) {
+        /* Merge new panelists with existing ones */
+        const merged = [...pageState.existingPanelists, ...res.data.participants];
         setPageState({
           phase: "panel_ready",
           discussionId,
           topic: t,
-          panelists: res.data.participants,
+          panelists: merged,
         });
       } else {
         setPageState({
-          phase: "error",
-          message: res.error ?? "AI 生成阵容失败",
+          phase: "generate_panel",
+          discussionId,
+          topic: t,
+          existingPanelists: pageState.existingPanelists,
+          status: pageState.status,
         });
       }
     } catch (err) {
@@ -140,11 +143,120 @@ export default function SetupPage() {
     }
   }, [pageState, count]);
 
+  const handleDeleteParticipant = useCallback(async (participantId: string) => {
+    setDeleting(participantId);
+    try {
+      const res = await removeParticipant(participantId);
+      if (res.success) {
+        /* Remove from local state */
+        if (pageState.phase === "generate_panel") {
+          const filtered = pageState.existingPanelists.filter((p) => p.id !== participantId);
+          setPageState({
+            ...pageState,
+            existingPanelists: filtered,
+          });
+          if (filtered.length > 0) setCount(filtered.length);
+        } else if (pageState.phase === "panel_ready") {
+          const filtered = pageState.panelists.filter((p) => p.id !== participantId);
+          if (filtered.length === 0) {
+            /* All deleted — go back to generate phase */
+            setPageState({
+              phase: "generate_panel",
+              discussionId: pageState.discussionId,
+              topic: pageState.topic,
+              existingPanelists: [],
+              status: "DRAFT",
+            });
+          } else {
+            setPageState({
+              ...pageState,
+              panelists: filtered,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("删除嘉宾失败:", (err as Error).message);
+    } finally {
+      setDeleting(null);
+    }
+  }, [pageState]);
+
+  const handleUseExisting = useCallback(async () => {
+    if (pageState.phase !== "generate_panel") return;
+    const { discussionId, topic: t, existingPanelists, status } = pageState;
+
+    if (status === "DRAFT") {
+      /* Need to confirm first */
+      setPageState({ phase: "confirming", discussionId, topic: t, panelists: existingPanelists });
+      try {
+        const res = await confirmDiscussion(discussionId);
+        if (res.success) {
+          navigate(`/studio/${discussionId}`);
+        } else {
+          setPageState({ phase: "error", message: res.error ?? "确认讨论失败" });
+        }
+      } catch (err) {
+        setPageState({
+          phase: "error",
+          message: (err as Error).message ?? "网络请求失败",
+        });
+      }
+    } else {
+      /* Already CONFIRMED — go directly */
+      navigate(`/studio/${discussionId}`);
+    }
+  }, [pageState, navigate]);
+
   const handleEnterStudio = useCallback(() => {
     if (pageState.phase === "panel_ready") {
       navigate(`/studio/${pageState.discussionId}`);
     }
   }, [pageState, navigate]);
+
+  /* ── Shared panelist card renderer ──────────────────── */
+
+  const renderGuestCard = (guest: ParticipantResponse, i: number, showDelete: boolean) => {
+    const color = guest.color || EXPERT_COLORS[i % EXPERT_COLORS.length];
+    const isDeleting = deleting === guest.id;
+    return (
+      <div key={guest.id} className={styles.guestCard}>
+        <div
+          className={styles.colorBar}
+          style={{ backgroundColor: guest.color || color }}
+        />
+        <div className={styles.guestRow}>
+          <div className={styles.guestInfo}>
+            <p className={styles.guestName}>
+              {guest.name}
+              {guest.role === "HOST" && (
+                <span className={styles.hostBadge}>🎤 主持</span>
+              )}
+            </p>
+            <p className={styles.guestTitle}>{guest.title}</p>
+          </div>
+          {showDelete && (
+            <button
+              className={styles.deleteBtn}
+              onClick={() => handleDeleteParticipant(guest.id)}
+              disabled={isDeleting}
+              title="移除此嘉宾"
+            >
+              {isDeleting ? "⏳" : "✕"}
+            </button>
+          )}
+        </div>
+        <span
+          className={styles.stanceTag}
+          style={{ backgroundColor: guest.color || color }}
+        >
+          {guest.stance.length > 20
+            ? guest.stance.slice(0, 20) + "..."
+            : guest.stance}
+        </span>
+      </div>
+    );
+  };
 
   /* ── Render ──────────────────────────────────────────── */
 
@@ -192,46 +304,44 @@ export default function SetupPage() {
               <p className={styles.topicDisplay}>{(pageState as { topic: string }).topic}</p>
             </div>
 
-            {/* ── Show existing panelists if present ──────── */}
+            {/* ── Existing panelists with delete ──────── */}
             {pageState.phase === "generate_panel" &&
-              pageState.existingPanelists.length > 0 && (
+              pageState.existingPanelists.length > 0 && (() => {
+                const existing = pageState.existingPanelists;
+                return (
               <div className={styles.field}>
                 <span className={styles.label}>
-                  📋 已有嘉宾（{pageState.existingPanelists.length} 人）
+                  📋 已有嘉宾（{existing.length} 人）
                 </span>
                 <div className={styles.existingNotice}>
-                  ⚠️ 此讨论已存在嘉宾阵容。如需调整人数或重新生成，请使用下方滑块。
+                  💡 你可以直接使用现有嘉宾进入演播室，或删除/新增嘉宾后重新生成。
                 </div>
-                <div className={styles.existingGrid}>
-                  {pageState.existingPanelists.map((guest, i) => {
-                    const color = guest.color || EXPERT_COLORS[i % EXPERT_COLORS.length];
-                    return (
-                      <div key={guest.id} className={styles.existingCard}>
-                        <div
-                          className={styles.colorBar}
-                          style={{ backgroundColor: guest.color || color }}
-                        />
-                        <span className={styles.existingName}>
-                          {guest.name}
-                          {guest.role === "HOST" && (
-                            <span className={styles.hostBadge}>🎤 主持</span>
-                          )}
-                        </span>
-                        <span className={styles.existingTitle}>{guest.title}</span>
-                      </div>
-                    );
-                  })}
+                <div className={styles.guestGrid}>
+                  {existing.map((guest, i) => renderGuestCard(guest, i, true))}
                 </div>
+
+                {/* Use existing button */}
+                <button
+                  className={styles.enterBtn}
+                  onClick={handleUseExisting}
+                >
+                  🚀 使用现有嘉宾进入演播室
+                </button>
               </div>
-            )}
+                );
+              })()}
 
             <div className={styles.field}>
-              <span className={styles.label}>嘉宾人数：{count} 人</span>
+              <span className={styles.label}>
+                {pageState.phase === "generate_panel" && pageState.existingPanelists.length > 0
+                  ? `新增嘉宾人数：${count} 人（当前共 ${pageState.existingPanelists.length} 人）`
+                  : `嘉宾人数：${count} 人`}
+              </span>
               <div className={styles.sliderRow}>
                 <input
                   className={styles.slider}
                   type="range"
-                  min={2}
+                  min={1}
                   max={6}
                   value={count}
                   onChange={(e) => setCount(Number(e.target.value))}
@@ -248,8 +358,8 @@ export default function SetupPage() {
             >
               {pageState.phase === "generating"
                 ? "⏳ AI 生成中..."
-                : pageState.existingPanelists.length > 0
-                  ? "🤖 重新生成嘉宾阵容"
+                : pageState.phase === "generate_panel" && pageState.existingPanelists.length > 0
+                  ? "🤖 追加生成嘉宾"
                   : "🤖 生成嘉宾阵容"}
             </button>
           </div>
@@ -267,34 +377,14 @@ export default function SetupPage() {
           </div>
 
           <section className={styles.panel}>
-            <h2 className={styles.panelTitle}>嘉宾阵容预览</h2>
+            <h2 className={styles.panelTitle}>
+              嘉宾阵容（{pageState.panelists.length} 人）
+            </h2>
+            <div className={styles.existingNotice} style={{ marginBottom: "var(--space-md)" }}>
+              💡 点击嘉宾卡片上的 ✕ 可移除此嘉宾。
+            </div>
             <div className={styles.guestGrid}>
-              {pageState.panelists.map((guest, i) => {
-                const color = guest.color || EXPERT_COLORS[i % EXPERT_COLORS.length];
-                return (
-                  <div key={guest.id} className={styles.guestCard}>
-                    <div
-                      className={styles.colorBar}
-                      style={{ backgroundColor: guest.color || color }}
-                    />
-                    <p className={styles.guestName}>
-                      {guest.name}
-                      {guest.role === "HOST" && (
-                        <span className={styles.hostBadge}>🎤 主持</span>
-                      )}
-                    </p>
-                    <p className={styles.guestTitle}>{guest.title}</p>
-                    <span
-                      className={styles.stanceTag}
-                      style={{ backgroundColor: guest.color || color }}
-                    >
-                      {guest.stance.length > 20
-                        ? guest.stance.slice(0, 20) + "..."
-                        : guest.stance}
-                    </span>
-                  </div>
-                );
-              })}
+              {pageState.panelists.map((guest, i) => renderGuestCard(guest, i, true))}
             </div>
           </section>
 
@@ -304,6 +394,13 @@ export default function SetupPage() {
             </button>
           </div>
         </>
+      )}
+
+      {/* ── Phase: confirming ──────── */}
+      {pageState.phase === "confirming" && (
+        <div className={styles.loadingBox}>
+          <p>⏳ 正在确认讨论...</p>
+        </div>
       )}
 
       {/* ── Phase: error ──────── */}

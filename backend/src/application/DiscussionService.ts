@@ -93,6 +93,12 @@ export class DiscussionService {
     });
   }
 
+  async removeParticipant(participantId: string): Promise<void> {
+    await prisma.participant.delete({
+      where: { id: participantId },
+    });
+  }
+
   /* ── Transcript ──────────────────────────────────── */
 
   async appendTranscript(

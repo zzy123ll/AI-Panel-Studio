@@ -69,6 +69,12 @@ export function createDiscussion(topic: string) {
   });
 }
 
+export function confirmDiscussion(id: string) {
+  return request<DiscussionResponse>(`/discussions/${id}/confirm`, {
+    method: "POST",
+  });
+}
+
 export function generatePanel(id: string, count = 4) {
   return request<{ participants: ParticipantResponse[] }>(
     `/discussions/${id}/generate`,
@@ -84,4 +90,10 @@ export function startDiscussion(id: string) {
     `/discussions/${id}/start`,
     { method: "POST" },
   );
+}
+
+export function removeParticipant(participantId: string) {
+  return request<void>(`/participants/${participantId}`, {
+    method: "DELETE",
+  });
 }

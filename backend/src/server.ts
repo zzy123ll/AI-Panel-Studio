@@ -273,12 +273,68 @@ app.post("/api/discussions/:id/generate", async (req, res) => {
   }
 
   const participants = await discussionService.addParticipants(id, members);
-  await discussionService.confirm(id);
+
+  /* Confirm only if still DRAFT (skip if already CONFIRMED) */
+  if (discussion.status === "DRAFT") {
+    await discussionService.confirm(id);
+  }
 
   console.log(
     `[api] panel generated for ${id}: ${participants.length} participants`,
   );
   res.json({ success: true, data: { participants } });
+});
+
+/**
+ * DELETE /api/participants/:id
+ * Remove a single participant from a discussion.
+ */
+app.delete("/api/participants/:id", async (req, res) => {
+  const { id } = req.params as { id: string };
+
+  try {
+    await discussionService.removeParticipant(id);
+    console.log(`[api] participant ${id} removed`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[api] removeParticipant failed:", (err as Error).message);
+    res.status(500).json({
+      success: false,
+      error: `Failed to remove participant: ${(err as Error).message}`,
+    });
+  }
+});
+
+/**
+ * POST /api/discussions/:id/confirm
+ * Confirm a DRAFT discussion (advance to CONFIRMED without generating panel).
+ */
+app.post("/api/discussions/:id/confirm", async (req, res) => {
+  const { id } = req.params as { id: string };
+
+  const discussion = await discussionService.findById(id);
+  if (!discussion) {
+    res.status(404).json({ success: false, error: "Discussion not found" });
+    return;
+  }
+  if (discussion.status !== "DRAFT") {
+    res.status(400).json({
+      success: false,
+      error: `Discussion must be in DRAFT status (current: ${discussion.status})`,
+    });
+    return;
+  }
+  if (discussion.participants.length === 0) {
+    res.status(400).json({
+      success: false,
+      error: "Cannot confirm without participants. Generate a panel first.",
+    });
+    return;
+  }
+
+  await discussionService.confirm(id);
+  console.log(`[api] discussion ${id} confirmed`);
+  res.json({ success: true, data: discussion });
 });
 
 /**
