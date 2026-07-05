@@ -45,6 +45,13 @@ export interface DiscussionEndPayload {
   transcriptCount: number;
 }
 
+export interface SummaryPayload {
+  discussionId: string;
+  summaryText: string;
+  consensus: string[];
+  divergences: Array<{ topic: string; positions: string[] }>;
+}
+
 const SOCKET_URL = "http://localhost:3001/studio";
 
 /* ── Singleton factory ──────────────────────────────── */
@@ -79,6 +86,7 @@ interface UseSocketOptions {
   onConsensusNew?: (payload: ConsensusDivergencePayload) => void;
   onDivergenceNew?: (payload: ConsensusDivergencePayload) => void;
   onDiscussionEnd?: (payload: DiscussionEndPayload) => void;
+  onSummary?: (payload: SummaryPayload) => void;
   onError?: (message: string) => void;
 }
 
@@ -91,6 +99,7 @@ export function useSocket({
   onConsensusNew,
   onDivergenceNew,
   onDiscussionEnd,
+  onSummary,
   onError,
 }: UseSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
@@ -102,6 +111,7 @@ export function useSocket({
     onConsensusNew,
     onDivergenceNew,
     onDiscussionEnd,
+    onSummary,
     onError,
   });
   callbacksRef.current = {
@@ -112,6 +122,7 @@ export function useSocket({
     onConsensusNew,
     onDivergenceNew,
     onDiscussionEnd,
+    onSummary,
     onError,
   };
 
@@ -140,6 +151,8 @@ export function useSocket({
       callbacksRef.current.onDivergenceNew?.(data);
     const handleDiscussionEnd = (data: DiscussionEndPayload) =>
       callbacksRef.current.onDiscussionEnd?.(data);
+    const handleSummary = (data: SummaryPayload) =>
+      callbacksRef.current.onSummary?.(data);
     const handleError = (data: { message: string }) =>
       callbacksRef.current.onError?.(data.message);
 
@@ -150,6 +163,7 @@ export function useSocket({
     s.on(WS_EVENT.CONSENSUS_NEW, handleConsensus);
     s.on(WS_EVENT.DIVERGENCE_NEW, handleDivergence);
     s.on(WS_EVENT.DISCUSSION_END, handleDiscussionEnd);
+    s.on(WS_EVENT.SUMMARY, handleSummary);
     s.on(WS_EVENT.ERROR, handleError);
 
     return () => {
@@ -163,6 +177,7 @@ export function useSocket({
       s.off(WS_EVENT.CONSENSUS_NEW, handleConsensus);
       s.off(WS_EVENT.DIVERGENCE_NEW, handleDivergence);
       s.off(WS_EVENT.DISCUSSION_END, handleDiscussionEnd);
+      s.off(WS_EVENT.SUMMARY, handleSummary);
       s.off(WS_EVENT.ERROR, handleError);
     };
   }, [discussionId]);

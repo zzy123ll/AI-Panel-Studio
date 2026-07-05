@@ -15,6 +15,7 @@ import type {
   AgentStatusPayload,
   ConsensusDivergencePayload,
   DiscussionEndPayload,
+  SummaryPayload,
 } from "../services/useSocket";
 import type {
   PanelistInfo,
@@ -222,12 +223,26 @@ export default function StudioPage() {
       setEnded(true);
       setIsRunning(false);
       setCurrentSpeaker(null);
+      /* Placeholder summary — will be replaced by onSummary with AI content */
       setSummary([
         {
           id: "summary-1",
           content: sanitizeAiText(
             `讨论已结束。共产生 ${payload.transcriptCount} 条发言，话题：${payload.topic}`,
           ),
+        },
+      ]);
+    },
+    [],
+  );
+
+  const handleSummary = useCallback(
+    (payload: SummaryPayload) => {
+      /* Replace placeholder with AI-generated summary */
+      setSummary([
+        {
+          id: "summary-ai",
+          content: sanitizeAiText(payload.summaryText),
         },
       ]);
     },
@@ -243,6 +258,7 @@ export default function StudioPage() {
     onConsensusNew: handleConsensusNew,
     onDivergenceNew: handleDivergenceNew,
     onDiscussionEnd: handleDiscussionEnd,
+    onSummary: handleSummary,
   });
 
   /* ── Actions ───────────────────────────────────────── */

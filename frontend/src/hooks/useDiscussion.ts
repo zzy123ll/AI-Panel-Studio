@@ -17,6 +17,7 @@ import type {
   AgentStatusPayload,
   ConsensusDivergencePayload,
   DiscussionEndPayload,
+  SummaryPayload,
 } from "../services/useSocket.js";
 import type { TranscriptLine } from "../stores/discussionStore.js";
 
@@ -105,6 +106,16 @@ export function useDiscussion(discussionId: string | undefined) {
     [dispatch],
   );
 
+  const handleSummary = useCallback(
+    (payload: SummaryPayload) => {
+      dispatch({
+        type: "END_DISCUSSION",
+        summary: [payload.summaryText],
+      });
+    },
+    [dispatch],
+  );
+
   const { confirm, stopSession } = useSocket({
     discussionId: discussionId ?? null,
     onTranscript: handleTranscript,
@@ -113,6 +124,7 @@ export function useDiscussion(discussionId: string | undefined) {
     onConsensusNew: handleConsensus,
     onDivergenceNew: handleDivergence,
     onDiscussionEnd: handleDiscussionEnd,
+    onSummary: handleSummary,
     onConfirmed: () => dispatch({ type: "SET_RUNNING", running: true }),
   });
 

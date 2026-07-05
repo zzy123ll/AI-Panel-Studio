@@ -24,6 +24,9 @@ export const WS_EVENT = {
   /** The discussion has been ended by the moderator or user */
   DISCUSSION_END: "DISCUSSION_END",
 
+  /** Final AI-generated summary when discussion ends */
+  SUMMARY: "SUMMARY",
+
   /** Full transcript history sent on client join */
   HISTORY: "HISTORY",
 

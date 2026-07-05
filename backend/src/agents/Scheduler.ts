@@ -47,12 +47,15 @@ export interface SchedulerConfig {
   tickIntervalMs?: number;
   /** Emit consensus every N transcript entries (default 5) */
   consensusInterval?: number;
+  /** Auto-end discussion after N messages (default 12, set 0 to disable) */
+  maxMessages?: number;
 }
 
 /* ── Scheduler ──────────────────────────────────────── */
 
 export class Scheduler extends EventEmitter {
   readonly tickInterval: number;
+  readonly maxMessages: number;
   private readonly topic: string;
   private readonly agents: Map<string, AgentBrain>;
   private readonly transcript: TranscriptEntry[] = [];
@@ -68,6 +71,7 @@ export class Scheduler extends EventEmitter {
     this.topic = config.topic;
     this.tickInterval = config.tickIntervalMs ?? 4000;
     this.consensusInterval = config.consensusInterval ?? 5;
+    this.maxMessages = config.maxMessages ?? 12;
     this.agents = new Map();
     for (const expert of config.experts) {
       const brain = new AgentBrain({
@@ -242,6 +246,14 @@ export class Scheduler extends EventEmitter {
       this.transcript.length % this.consensusInterval === 0
     ) {
       this.extractAndBroadcastConsensus();
+    }
+
+    /* Auto-end when maxMessages reached */
+    if (
+      this.maxMessages > 0 &&
+      this.transcript.length >= this.maxMessages
+    ) {
+      this.stop();
     }
   }
 

@@ -25,6 +25,18 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+/* ── Root health-check ───────────────────────────────── */
+
+app.get("/", (_req, res) => {
+  res.json({
+    name: "AI Panel Studio API",
+    version: "1.0.0",
+    status: "running",
+    docs: "/api",
+    websocket: "ws://localhost:" + PORT + "/studio",
+  });
+});
+
 /* ── Discussion Session Store ───────────────────────── */
 
 interface DiscussionSession {
@@ -148,6 +160,7 @@ function wireSchedulerEvents(
     summaryService
       .generate(lines)
       .then((summary) => {
+        /* Emit final consensus & divergence to the live boards */
         io.of("/studio")
           .to(discussionId)
           .emit(WS_EVENT.CONSENSUS_NEW, {
@@ -164,6 +177,16 @@ function wireSchedulerEvents(
                 `${(d as { topic: string }).topic}: ${((d as { positions: string[] }).positions ?? []).join(" vs ")}`,
             ),
             isFinal: true,
+          });
+
+        /* Emit unified summary for the summary bar */
+        io.of("/studio")
+          .to(discussionId)
+          .emit(WS_EVENT.SUMMARY, {
+            discussionId,
+            summaryText: summary.summaryText,
+            consensus: summary.consensus,
+            divergences: summary.divergences,
           });
       })
       .catch((err) =>
@@ -292,6 +315,7 @@ app.post("/api/discussions/:id/start", async (req, res) => {
     experts,
     tickIntervalMs: 4000,
     consensusInterval: 5,
+    maxMessages: 12,  // auto-end after 12 messages (~3 consensus rounds)
   });
 
   wireSchedulerEvents(scheduler, id);

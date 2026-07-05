@@ -244,8 +244,13 @@ pnpm exec playwright test
 
 ```
 DRAFT ──→ CONFIRMED ──→ ONGOING ──→ ENDED
-          (AI 生成)     (调度器)    (手动结束)
+          (AI 生成)     (调度器)    (手动结束 / 12轮自动结束)
 ```
+
+- 每 4 秒一轮，随机选取 1-2 位专家发言
+- 每 5 轮 AI 自动提炼共识与分歧
+- **默认 12 轮自动结束**（可在 `server.ts` 的 `Scheduler` 构造中修改 `maxMessages`）
+- 结束时 AI 生成综合总结，通过 `SUMMARY` 事件推送至前端
 
 ## 专家状态机
 
