@@ -1,30 +1,33 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
 }
 
 .entry {
   display: flex;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
   background: var(--card-bg);
   border: 1px solid transparent;
-  transition: border-color 0.2s;
+  transition: all var(--transition-fast);
+  animation: slideUp var(--transition-base) ease both;
 }
 
 .entry:hover {
-  border-color: var(--border-color);
+  border-color: var(--border-color-light);
+  background: var(--card-bg-hover);
 }
 
 /* ── Color Swatch ───────────────── */
 
 .swatch {
-  width: 3px;
+  width: 4px;
   border-radius: 2px;
   flex-shrink: 0;
   align-self: stretch;
+  opacity: 0.9;
 }
 
 /* ── Body ───────────────────────── */
@@ -34,7 +37,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .meta {
@@ -45,16 +48,32 @@
 }
 
 .speaker {
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 12px;
 }
 
 .time {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .content {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.7;
   color: var(--text-secondary);
+  word-break: break-word;
+}
+
+/* ── Empty state ────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  gap: var(--space-sm);
 }

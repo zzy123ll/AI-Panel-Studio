@@ -4,38 +4,69 @@
 
 :root {
   /* ── Surface ─────────────────────── */
-  --primary-bg: #0f1117;
-  --card-bg: #1a1d27;
+  --primary-bg: #0a0c14;
+  --primary-bg-soft: #111420;
+  --card-bg: #171a28;
+  --card-bg-hover: #1d2135;
+  --card-bg-elevated: #1e2240;
+  --glass-bg: rgba(23, 26, 40, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
 
   /* ── Text ────────────────────────── */
-  --text-primary: #e8eaed;
-  --text-secondary: #9aa0a6;
+  --text-primary: #f0f2f5;
+  --text-secondary: #8b90a0;
+  --text-tertiary: #5c6174;
+  --text-inverse: #0a0c14;
 
   /* ── Accent ──────────────────────── */
-  --host-color: #f0b429;
-  --border-color: #2d3140;
+  --host-color: #f5b642;
+  --host-color-dim: rgba(245, 182, 66, 0.15);
+  --success-color: #34d399;
+  --danger-color: #f87171;
+  --info-color: #60a5fa;
+  --warning-color: #fbbf24;
 
-  /* ── Expert Palette (≥8 vivid colors) ─ */
-  --expert-0: #4fc3f7;
-  --expert-1: #ef5350;
-  --expert-2: #66bb6a;
-  --expert-3: #ff7043;
-  --expert-4: #ab47bc;
-  --expert-5: #ffee58;
-  --expert-6: #26c6da;
-  --expert-7: #ec407a;
-  --expert-8: #8d6e63;
-  --expert-9: #78909c;
+  /* ── Expert Palette ──────────────── */
+  --expert-0: #38bdf8;
+  --expert-1: #fb7185;
+  --expert-2: #4ade80;
+  --expert-3: #fb923c;
+  --expert-4: #a78bfa;
+  --expert-5: #facc15;
+  --expert-6: #2dd4bf;
+  --expert-7: #f472b6;
+  --expert-8: #a8a29e;
+  --expert-9: #818cf8;
+
+  /* ── Border ──────────────────────── */
+  --border-color: #232840;
+  --border-color-light: #2f3450;
+  --border-color-accent: rgba(245, 182, 66, 0.3);
 
   /* ── Radius & Spacing ────────────── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* ── Shadows ─────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow-host: 0 0 24px rgba(245, 182, 66, 0.15);
+  --shadow-glow-speaking: 0 0 20px rgba(56, 189, 248, 0.25);
+
+  /* ── Transitions ─────────────────── */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -54,11 +85,11 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system,
-    sans-serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
   font-size: 14px;
+  line-height: 1.6;
   color: var(--text-primary);
-  background-color: var(--primary-bg);
+  background: var(--primary-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -81,6 +112,14 @@ button {
 }
 
 /* ═══════════════════════════════════════════════════════
+   Typography
+   ═══════════════════════════════════════════════════════ */
+
+h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+h3 { font-size: 1rem; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════
    Utility Classes
    ═══════════════════════════════════════════════════════ */
 
@@ -91,7 +130,7 @@ button {
 }
 
 .scroll-container::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .scroll-container::-webkit-scrollbar-track {
@@ -100,11 +139,40 @@ button {
 
 .scroll-container::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-color-light);
+}
+
+/* ── Global animation keyframes ───── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Skeleton loading ─────────────── */
+
+.skeleton {
+  background: linear-gradient(90deg, var(--card-bg) 25%, var(--card-bg-hover) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
 }

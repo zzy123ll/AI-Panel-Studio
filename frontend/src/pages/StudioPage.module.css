@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   Loading / Error
+   Loading / Error states
    ═══════════════════════════════════════════════════════ */
 
 .loadingContainer {
@@ -8,45 +8,47 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
 
 .loadingText {
   font-size: 16px;
   color: var(--text-secondary);
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .loadingError {
   font-size: 16px;
-  color: #ef5350;
+  color: var(--danger-color);
 }
 
 .loadingRetry {
-  padding: 8px 20px;
-  border-radius: var(--radius-sm);
+  padding: 10px 28px;
+  border-radius: 999px;
   background: var(--card-bg);
   color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color-light);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .loadingRetry:hover {
-  background: var(--border-color);
+  background: var(--card-bg-hover);
 }
 
 /* ═══════════════════════════════════════════════════════
-   Studio Layout — CSS Grid (1fr + 400px)
+   Studio Layout — CSS Grid (1fr + 420px)
    ═══════════════════════════════════════════════════════ */
 
 .layout {
   height: 100%;
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr 420px;
   grid-template-rows: 1fr;
   overflow: hidden;
+  background: var(--primary-bg);
 }
 
 /* ── Left Column ─────────────────── */
@@ -55,8 +57,37 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-lg);
   gap: var(--space-md);
+}
+
+/* ── Summary Bar ─────────────────── */
+
+.summaryBar {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--card-bg-elevated), var(--card-bg));
+  border: 1px solid var(--border-color-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  animation: slideUp var(--transition-slow) ease;
+  box-shadow: var(--shadow-glow-host);
+}
+
+.summaryLabel {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--host-color);
+}
+
+.summaryText {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text-primary);
 }
 
 /* ── Main Stage ──────────────────── */
@@ -64,42 +95,60 @@
 .stage {
   flex-shrink: 0;
   background: var(--card-bg);
-  border: 2px solid var(--host-color);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  box-shadow: 0 0 24px rgba(240, 180, 41, 0.12);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  position: relative;
+  overflow: hidden;
+  min-height: 140px;
+}
+
+.stage::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--host-color), #e8952e, var(--host-color));
+  opacity: 0.6;
 }
 
 .stageLabel {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--host-color);
 }
 
 .stageSpeaker {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 .stageStance {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 .stageBubble {
   margin-top: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  background: var(--primary-bg);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
+  padding: var(--space-md);
+  background: var(--primary-bg-soft);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.7;
   border-left: 3px solid var(--host-color);
+  animation: slideUp var(--transition-base) ease;
 }
 
 /* ── Panelist Grid ───────────────── */
@@ -108,7 +157,6 @@
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
   gap: var(--space-sm);
   overflow-y: auto;
   align-content: start;
@@ -117,12 +165,11 @@
 .panelLabel {
   grid-column: 1 / -1;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: -4px;
-  flex-shrink: 0;
+  letter-spacing: 0.05em;
+  padding: var(--space-xs) 0;
 }
 
 /* ── Right Sidebar ───────────────── */
@@ -132,7 +179,7 @@
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border-color);
-  background: var(--primary-bg);
+  background: var(--primary-bg-soft);
 }
 
 .transcriptSection {
@@ -154,56 +201,21 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
-  padding: var(--space-sm) var(--space-md);
+  padding: 14px var(--space-lg);
   flex-shrink: 0;
-  background: var(--primary-bg);
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .sectionBody {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-sm);
-}
-
-/* ── Bottom Tab Bar + Mobile Panel ── */
-
-.mobilePanel {
-  display: none;
-}
-
-.tabBar {
-  display: none;
-}
-
-/* ── Summary Bar (post-end) ──────── */
-
-.summaryBar {
-  flex-shrink: 0;
-  background: var(--card-bg);
-  border: 1px solid var(--host-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.summaryLabel {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--host-color);
-  margin-bottom: var(--space-xs);
-}
-
-.summaryText {
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-primary);
 }
 
 /* ── Controls Bar ────────────────── */
@@ -219,39 +231,52 @@
 .startBtn,
 .endBtn,
 .backBtn {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s, opacity 0.2s;
+  padding: 12px 32px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all var(--transition-base);
+  letter-spacing: 0.02em;
 }
 
 .startBtn {
-  background: #4caf50;
-  color: #fff;
+  background: linear-gradient(135deg, #34d399, #059669);
+  color: var(--text-inverse);
+  box-shadow: 0 2px 12px rgba(52, 211, 153, 0.25);
 }
 
 .startBtn:hover {
-  background: #43a047;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
 }
 
 .endBtn {
-  background: #ef5350;
+  background: linear-gradient(135deg, var(--danger-color), #dc2626);
   color: #fff;
+  box-shadow: 0 2px 12px rgba(248, 113, 113, 0.25);
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .endBtn:hover {
-  background: #e53935;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(248, 113, 113, 0.4);
 }
 
 .backBtn {
   background: var(--card-bg);
   color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color-light);
 }
 
 .backBtn:hover {
-  background: var(--border-color);
+  background: var(--card-bg-hover);
+}
+
+/* ── Mobile Tab Bar ──────────────── */
+
+.tabBar,
+.mobilePanel {
+  display: none;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -264,9 +289,7 @@
     grid-template-rows: 1fr auto;
   }
 
-  .right {
-    display: none;
-  }
+  .right { display: none; }
 
   .mobilePanel {
     display: block;
@@ -282,23 +305,17 @@
 
   .tab {
     flex: 1;
-    padding: var(--space-sm) 0;
+    padding: 14px 0;
     text-align: center;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--text-secondary);
     border-bottom: 2px solid transparent;
-    transition: color 0.2s, border-color 0.2s;
+    transition: all var(--transition-fast);
   }
 
   .tabActive {
     color: var(--host-color);
     border-bottom-color: var(--host-color);
-  }
-
-  .mobilePanel {
-    height: 100%;
-    overflow-y: auto;
-    padding: var(--space-sm);
   }
 }
