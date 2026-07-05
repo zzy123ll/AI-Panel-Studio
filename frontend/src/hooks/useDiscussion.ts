@@ -41,10 +41,8 @@ export function useDiscussion(discussionId: string | undefined) {
   );
 
   const handleHistory = useCallback(
-    (payload: HistoryPayload) => {
-      if (payload.entries.length > 0) {
-        // History is loaded but we keep initial mock data for demo
-      }
+    (_payload: HistoryPayload) => {
+      // History replay — future: dispatch INIT_TRANSCRIPT to restore from DB
     },
     [],
   );
